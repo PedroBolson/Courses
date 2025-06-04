@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, Clock, ChevronRight } from 'lucide-react';
 import EnrollmentModal from './EnrollmentModal';
+import { fixObjectEncoding } from '@/utils/textUtils';
 
 interface Area {
     id: number;
@@ -65,17 +66,17 @@ export default function CoursesSection() {
                 setLoading(true);                // Fetch areas
                 const areasResponse = await fetch(`${API_URL}/areas`);
                 const areasData = await areasResponse.json();
-                setAreas(areasData.rows || []);
+                setAreas(fixObjectEncoding(areasData.rows || []));
                 addQuery(areasData.executedQuery || 'SELECT * FROM catalogo.Areas');
 
                 // Fetch cursos
                 const cursosResponse = await fetch(`${API_URL}/cursos`);
                 const cursosData = await cursosResponse.json();
-                setCursos(cursosData.rows || []);
+                setCursos(fixObjectEncoding(cursosData.rows || []));
                 addQuery(cursosData.executedQuery || 'SELECT * FROM catalogo.Cursos');                // Fetch professores
                 const professoresResponse = await fetch(`${API_URL}/professores`);
                 const professoresData = await professoresResponse.json();
-                setProfessores(professoresData.rows || []);
+                setProfessores(fixObjectEncoding(professoresData.rows || []));
                 addQuery(professoresData.executedQuery || 'SELECT * FROM security.Professores p JOIN catalogo.Pessoas pe ON p.pessoa_id = pe.id');
 
             } catch (error) {

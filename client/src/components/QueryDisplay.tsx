@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Code, Database, EyeOff, Clock } from 'lucide-react';
+import { fixEncoding } from '@/utils/textUtils';
 
 interface Query {
     query: string;
@@ -68,10 +69,9 @@ export default function QueryDisplay({ queries, title = "SQL Queries Executadas"
                                             {query.endpoint}
                                         </span>
                                     )}
-                                </div>
-                                <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
+                                </div>                                <div className="bg-gray-50 dark:bg-gray-900 rounded p-2">
                                     <code className="text-xs text-gray-800 dark:text-gray-200 font-mono break-all">
-                                        {query.query}
+                                        {fixEncoding(query.query)}
                                     </code>
                                 </div>
                             </div>

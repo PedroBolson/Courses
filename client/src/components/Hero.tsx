@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Star, Users, BookOpen, Trophy } from 'lucide-react';
 import { useQuery } from '@/contexts/QueryContext';
+import { fixObjectEncoding } from '@/utils/textUtils';
 
 export default function Hero() {
     const [stats, setStats] = useState({
@@ -16,12 +17,11 @@ export default function Hero() {
         const fetchStats = async () => {
             try {
                 // Fetch alunos count
-                const alunosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/alunos`);
-                const alunosData = await alunosResponse.json();
+                const alunosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/alunos`); const alunosData = fixObjectEncoding(await alunosResponse.json());
 
                 // Fetch cursos count
                 const cursosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cursos`);
-                const cursosData = await cursosResponse.json();
+                const cursosData = fixObjectEncoding(await cursosResponse.json());
 
                 if (alunosData.executedQuery) addQuery(alunosData.executedQuery);
                 if (cursosData.executedQuery) addQuery(cursosData.executedQuery); setStats({

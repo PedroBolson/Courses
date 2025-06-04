@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Users, BookOpen, Calendar, DollarSign, BarChart3, Settings } from 'lucide-react';
 import { useQuery } from '@/contexts/QueryContext';
+import { fixObjectEncoding } from '@/utils/textUtils';
 
 interface AdminDashboardProps {
     isOpen: boolean;
@@ -35,14 +36,12 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/cursos`),
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/palestras`),
                     fetch(`${process.env.NEXT_PUBLIC_API_URL}/pagamentos`)
-                ]);
-
-                const [alunosData, cursosData, palestrasData, pagamentosData] = await Promise.all([
+                ]); const [alunosData, cursosData, palestrasData, pagamentosData] = await Promise.all([
                     alunosRes.json(),
                     cursosRes.json(),
                     palestrasRes.json(),
                     pagamentosRes.json()
-                ]);
+                ].map(promise => promise.then(data => fixObjectEncoding(data))));
 
                 // Add queries to context
                 if (alunosData.executedQuery) addQuery(alunosData.executedQuery);

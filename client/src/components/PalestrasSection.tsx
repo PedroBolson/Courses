@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import { useQuery } from '@/contexts/QueryContext';
+import { fixObjectEncoding } from '@/utils/textUtils';
 
 interface Pessoa {
     id: number;
@@ -36,23 +37,22 @@ export default function PalestrasSection() {
     const { addQuery } = useQuery(); useEffect(() => {
         const fetchData = async () => {
             try {
-                setLoading(true);
-                // Fetch palestras
+                setLoading(true);                // Fetch palestras
                 const palestrasResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/palestras`);
                 const palestrasData = await palestrasResponse.json();
-                setPalestras(palestrasData.rows || []);
+                setPalestras(fixObjectEncoding(palestrasData.rows || []));
                 addQuery(palestrasData.executedQuery || 'SELECT * FROM catalogo.Palestras', '/palestras');
 
                 // Fetch pessoas
                 const pessoasResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pessoas`);
                 const pessoasData = await pessoasResponse.json();
-                setPessoas(pessoasData.rows || []);
+                setPessoas(fixObjectEncoding(pessoasData.rows || []));
                 addQuery(pessoasData.executedQuery || 'SELECT * FROM catalogo.Pessoas', '/pessoas');
 
                 // Fetch areas
                 const areasResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/areas`);
                 const areasData = await areasResponse.json();
-                setAreas(areasData.rows || []);
+                setAreas(fixObjectEncoding(areasData.rows || []));
                 addQuery(areasData.executedQuery || 'SELECT * FROM catalogo.Areas', '/areas');
 
             } catch (error) {
