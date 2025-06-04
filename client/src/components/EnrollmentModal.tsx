@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, User, Mail, CreditCard, BookOpen, CheckCircle } from 'lucide-react';
+import { X, User, Mail, CreditCard, BookOpen, CheckCircle, DollarSign } from 'lucide-react';
 
 interface Curso {
     id: number;
@@ -25,6 +25,7 @@ interface StudentData {
     cidade: string;
     estado: string;
     cep: string;
+    senha: string;
 }
 
 export default function EnrollmentModal({ isOpen, onClose, curso }: EnrollmentModalProps) {
@@ -37,13 +38,13 @@ export default function EnrollmentModal({ isOpen, onClose, curso }: EnrollmentMo
         endereco: '',
         cidade: '',
         estado: '',
-        cep: ''
+        cep: '',
+        senha: ''
     });
     const [paymentMethod, setPaymentMethod] = useState('');
     const [loading, setLoading] = useState(false);
     const [enrolled, setEnrolled] = useState(false);
-
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const [createdIds, setCreatedIds] = useState<{ pessoaId?: number; alunoId?: number; pagamentoId?: number }>({}); const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
     const handleInputChange = (field: keyof StudentData, value: string) => {
         setStudentData(prev => ({ ...prev, [field]: value }));
@@ -55,13 +56,29 @@ export default function EnrollmentModal({ isOpen, onClose, curso }: EnrollmentMo
 
     const handlePrevStep = () => {
         if (step > 1) setStep(step - 1);
+    }; const generatePassword = () => {
+        return Math.random().toString(36).slice(-8).toUpperCase();
+    };
+
+    const getPaymentAmount = () => {
+        switch (paymentMethod) {
+            case 'pix':
+                return 269.10; // 10% discount
+            case 'credit':
+            case 'debit':
+            case 'boleto':
+                return 299.00;
+            default:
+                return 299.00;
+        }
     };
 
     const handleEnrollment = async () => {
         setLoading(true);
         try {
-            // First create the student
-            const studentResponse = await fetch(`${API_URL}/pessoas`, {
+            // Generate password for new student
+            const generatedPassword = generatePassword();            // Step 1: Create pessoa record
+            const pessoaResponse = await fetch(`${API_URL}/pessoas`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -69,58 +86,99 @@ export default function EnrollmentModal({ isOpen, onClose, curso }: EnrollmentMo
                 body: JSON.stringify({
                     nome: studentData.nome,
                     email: studentData.email,
-                    telefone: studentData.telefone,
-                    endereco: studentData.endereco,
-                    cidade: studentData.cidade,
-                    estado: studentData.estado,
-                    cep: studentData.cep
+                    telefone: studentData.telefone
                 }),
             });
 
-            if (studentResponse.ok) {
-                const studentResult = await studentResponse.json();
+            if (!pessoaResponse.ok) {
+                throw new Error('Failed to create pessoa record');
+            } const pessoaResult = await pessoaResponse.json();
+            const pessoaId = pessoaResult.rows[0].id;
+            setCreatedIds(prev => ({ ...prev, pessoaId }));// Step 2: Create aluno record
+            const alunoResponse = await fetch(`${API_URL}/alunos`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    pessoa_id: pessoaId,
+                    senha: generatedPassword
+                }),
+            });
 
-                // Then create the student record
-                const alunoResponse = await fetch(`${API_URL}/alunos`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        pessoa_id: studentResult.data.id,
-                        cpf: studentData.cpf
-                    }),
-                });
+            if (!alunoResponse.ok) {
+                throw new Error('Failed to create aluno record');
+            } const alunoResult = await alunoResponse.json();
+            const alunoId = alunoResult.rows[0].id;
+            setCreatedIds(prev => ({ ...prev, alunoId }));// Step 3: Process payment and create payment record
+            const paymentAmount = getPaymentAmount();
 
-                if (alunoResponse.ok) {
-                    setEnrolled(true);
-                    setTimeout(() => {
-                        onClose();
-                        setEnrolled(false);
-                        setStep(1);
-                        setStudentData({
-                            nome: '',
-                            email: '',
-                            telefone: '',
-                            cpf: '',
-                            endereco: '',
-                            cidade: '',
-                            estado: '',
-                            cep: ''
-                        });
-                    }, 3000);
-                }
+            const pagamentoResponse = await fetch(`${API_URL}/pagamentos`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    aluno_id: alunoId,
+                    valor: paymentAmount,
+                    forma_pagamento: paymentMethod
+                }),
+            });
+
+            if (!pagamentoResponse.ok) {
+                throw new Error('Failed to create payment record');
+            } const pagamentoResult = await pagamentoResponse.json();
+            const pagamentoId = pagamentoResult.rows[0].id;
+            setCreatedIds(prev => ({ ...prev, pagamentoId }));
+
+            // Step 4: Enroll student in course
+            const matriculaResponse = await fetch(`${API_URL}/alunos-cursos`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    aluno_id: alunoId,
+                    curso_id: curso?.id
+                }),
+            });
+
+            if (!matriculaResponse.ok) {
+                throw new Error('Failed to enroll student in course');
             }
+
+            // Success! Show completion message
+            setStudentData(prev => ({ ...prev, senha: generatedPassword }));
+            setEnrolled(true);
+
+            setTimeout(() => {
+                onClose();
+                setEnrolled(false);
+                setStep(1);
+                setPaymentMethod('');
+                setStudentData({
+                    nome: '',
+                    email: '',
+                    telefone: '',
+                    cpf: '',
+                    endereco: '',
+                    cidade: '',
+                    estado: '',
+                    cep: '',
+                    senha: ''
+                });
+                setCreatedIds({});
+            }, 5000);
+
         } catch (error) {
-            console.error('Error enrolling student:', error);
+            console.error('Error during enrollment:', error);
+            alert('Erro durante a inscrição. Tente novamente.');
         } finally {
             setLoading(false);
         }
     };
 
-    if (!isOpen) return null;
-
-    if (enrolled) {
+    if (!isOpen) return null; if (enrolled) {
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white dark:bg-slate-800 rounded-xl p-8 max-w-md w-full mx-4 text-center">
@@ -131,8 +189,51 @@ export default function EnrollmentModal({ isOpen, onClose, curso }: EnrollmentMo
                     <p className="text-gray-600 dark:text-gray-300 mb-4">
                         Sua inscrição no curso <strong>{curso?.titulo}</strong> foi realizada com sucesso!
                     </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Você receberá um email com as instruções para acessar o portal do aluno.
+
+                    {/* Payment Summary */}
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-4">
+                        <div className="flex items-center justify-center mb-2">
+                            <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400 mr-2" />
+                            <span className="font-medium text-green-800 dark:text-green-200">
+                                Pagamento Aprovado
+                            </span>
+                        </div>
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                            Método: {paymentMethod === 'pix' ? 'PIX' : paymentMethod === 'credit' ? 'Cartão de Crédito' : paymentMethod === 'debit' ? 'Cartão de Débito' : 'Boleto Bancário'}
+                        </p>
+                        <p className="text-sm text-green-700 dark:text-green-300">
+                            Valor: R$ {getPaymentAmount().toFixed(2).replace('.', ',')}
+                        </p>
+                        {createdIds.pagamentoId && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                ID do Pagamento: #{createdIds.pagamentoId}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Login Credentials */}
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                        <div className="flex items-center justify-center mb-2">
+                            <User className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2" />
+                            <span className="font-medium text-blue-800 dark:text-blue-200">
+                                Seus Dados de Acesso
+                            </span>
+                        </div>
+                        <div className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
+                            <p><strong>Email:</strong> {studentData.email}</p>
+                            <p><strong>Senha:</strong> {studentData.senha}</p>
+                            {createdIds.alunoId && (
+                                <p><strong>ID do Aluno:</strong> #{createdIds.alunoId}</p>
+                            )}
+                        </div>
+                    </div>
+
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                        Você receberá um email com as instruções para acessar o portal do aluno e os detalhes do seu pagamento.
+                    </p>
+
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                        Esta janela será fechada automaticamente em alguns segundos.
                     </p>
                 </div>
             </div>
@@ -167,8 +268,8 @@ export default function EnrollmentModal({ isOpen, onClose, curso }: EnrollmentMo
                             <div key={num} className="flex items-center">
                                 <div
                                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${step >= num
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
                                         }`}
                                 >
                                     {num}
@@ -176,8 +277,8 @@ export default function EnrollmentModal({ isOpen, onClose, curso }: EnrollmentMo
                                 {num < 3 && (
                                     <div
                                         className={`w-12 h-1 mx-2 ${step > num
-                                                ? 'bg-blue-600'
-                                                : 'bg-gray-200 dark:bg-gray-600'
+                                            ? 'bg-blue-600'
+                                            : 'bg-gray-200 dark:bg-gray-600'
                                             }`}
                                     />
                                 )}

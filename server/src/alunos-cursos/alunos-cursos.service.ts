@@ -4,11 +4,11 @@ import { DatabaseService } from '../database/database.service';
 @Injectable()
 export class AlunosCursosService {
   constructor(private db: DatabaseService) { }
-
   // Inscrever aluno em curso
   async create(aluno_id: number, curso_id: number) {
     const query = `
       INSERT INTO relacionamento.AlunosCursos (aluno_id, curso_id)
+      OUTPUT INSERTED.id
       VALUES (@param0, @param1)`;
     return this.db.executeQuery(query, [aluno_id, curso_id]);
   }

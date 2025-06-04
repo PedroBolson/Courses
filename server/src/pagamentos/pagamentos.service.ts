@@ -4,11 +4,11 @@ import { DatabaseService } from '../database/database.service';
 @Injectable()
 export class PagamentosService {
   constructor(private db: DatabaseService) { }
-
   // Registra novo pagamento
   async create(aluno_id: number, valor: number, forma_pagamento: string) {
     const query = `
       INSERT INTO catalogo.Pagamentos (aluno_id, valor, forma_pagamento)
+      OUTPUT INSERTED.id
       VALUES (@param0, @param1, @param2)`;
     return this.db.executeQuery(query, [aluno_id, valor, forma_pagamento]);
   }

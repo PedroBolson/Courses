@@ -5,13 +5,13 @@ import * as bcrypt from 'bcrypt';
 @Injectable()
 export class AlunosService {
   constructor(private db: DatabaseService) { }
-
   // Cria novo aluno (hash de senha + insert em security.Alunos)
   async create(pessoa_id: number, senha: string) {
     const saltRounds = 10;
     const hashed = await bcrypt.hash(senha, saltRounds);
     const query = `
       INSERT INTO security.Alunos (pessoa_id, senha_hash)
+      OUTPUT INSERTED.id
       VALUES (@param0, @param1)`;
     return this.db.executeQuery(query, [pessoa_id, hashed]);
   }

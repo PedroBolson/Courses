@@ -4,11 +4,11 @@ import { DatabaseService } from '../database/database.service';
 @Injectable()
 export class PessoasService {
   constructor(private db: DatabaseService) { }
-
   // Cria nova Pessoa (insert em catalogo.Pessoas)
   async create(nome: string, email: string, telefone: string) {
     const query = `
       INSERT INTO catalogo.Pessoas (nome, email, telefone)
+      OUTPUT INSERTED.id
       VALUES (@param0, @param1, @param2)`;
     return this.db.executeQuery(query, [nome, email, telefone]);
   }

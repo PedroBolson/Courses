@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowRight, Star, Users, BookOpen, Trophy } from 'lucide-react';
 import { useQuery } from '@/contexts/QueryContext';
 import { fixObjectEncoding } from '@/utils/textUtils';
+import EnrollmentFlow from './EnrollmentFlow';
 
 export default function Hero() {
     const [stats, setStats] = useState({
@@ -11,20 +12,34 @@ export default function Hero() {
         cursos: 0,
         aprovacao: 95
     });
+    const [enrollmentFlow, setEnrollmentFlow] = useState({
+        isOpen: false,
+        courseName: 'Curso ENEM Preparatório',
+        coursePrice: 299.90,
+        courseId: 1
+    });
     const { addQuery } = useQuery();
+
+    const handleChooseCourse = () => {
+        setEnrollmentFlow(prev => ({ ...prev, isOpen: true }));
+    };
+
+    const handleCloseEnrollment = () => {
+        setEnrollmentFlow(prev => ({ ...prev, isOpen: false }));
+    };
 
     useEffect(() => {
         const fetchStats = async () => {
-            try {
-                // Fetch alunos count
-                const alunosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/alunos`); const alunosData = fixObjectEncoding(await alunosResponse.json());
+            try {                // Fetch alunos count
+                const alunosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/alunos`);
+                const alunosData = fixObjectEncoding(await alunosResponse.json());
 
                 // Fetch cursos count
                 const cursosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cursos`);
-                const cursosData = fixObjectEncoding(await cursosResponse.json());
+                const cursosData = fixObjectEncoding(await cursosResponse.json()); if (alunosData.executedQuery) addQuery(alunosData.executedQuery);
+                if (cursosData.executedQuery) addQuery(cursosData.executedQuery);
 
-                if (alunosData.executedQuery) addQuery(alunosData.executedQuery);
-                if (cursosData.executedQuery) addQuery(cursosData.executedQuery); setStats({
+                setStats({
                     alunos: alunosData.rows?.length || 0,
                     cursos: cursosData.rows?.length || 0,
                     aprovacao: 95
@@ -32,7 +47,9 @@ export default function Hero() {
             } catch (error) {
                 console.error('Error fetching stats:', error);
             }
-        }; fetchStats();
+        };
+
+        fetchStats();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Intencionalmente não incluindo addQuery para evitar loop infinito
     return (
@@ -93,7 +110,7 @@ export default function Hero() {
 
                         {/* CTA */}
                         <div className="flex flex-col sm:flex-row gap-4">
-                            <button className="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl">
+                            <button onClick={handleChooseCourse} className="inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-lg font-semibold transition-colors shadow-lg hover:shadow-xl">
                                 <span>Escolher Meu Curso</span>
                                 <ArrowRight className="h-5 w-5" />
                             </button>
@@ -145,6 +162,15 @@ export default function Hero() {
                     </div>
                 </div>
             </div>
+
+            {/* Enrollment Flow Component */}
+            <EnrollmentFlow
+                isOpen={enrollmentFlow.isOpen}
+                onClose={handleCloseEnrollment}
+                courseName={enrollmentFlow.courseName}
+                coursePrice={enrollmentFlow.coursePrice}
+                courseId={enrollmentFlow.courseId}
+            />
         </section>
     );
 }

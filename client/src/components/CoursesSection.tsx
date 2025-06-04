@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, Clock, ChevronRight } from 'lucide-react';
 import EnrollmentModal from './EnrollmentModal';
+import EnrollmentFlow from './EnrollmentFlow';
 import { fixObjectEncoding } from '@/utils/textUtils';
 
 interface Area {
@@ -41,23 +42,40 @@ export default function CoursesSection() {
     const [professores, setProfessores] = useState<Professor[]>([]);
     const [selectedArea, setSelectedArea] = useState<number | null>(null);
     const [queries, setQueries] = useState<QueryDisplay[]>([]);
-    const [showQueries, setShowQueries] = useState(false);
-    const [loading, setLoading] = useState(true);
+    const [showQueries, setShowQueries] = useState(false); const [loading, setLoading] = useState(true);
     const [enrollmentModal, setEnrollmentModal] = useState<{ isOpen: boolean; curso: Curso | null }>({
         isOpen: false,
         curso: null
     });
+    const [enrollmentFlow, setEnrollmentFlow] = useState<{ isOpen: boolean; courseName: string; coursePrice: number; courseId: number }>({
+        isOpen: false,
+        courseName: '',
+        coursePrice: 299.90,
+        courseId: 1
+    });
+    const [useNewEnrollmentFlow, setUseNewEnrollmentFlow] = useState(false);
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; const addQuery = (query: string) => {
         setQueries(prev => [...prev, { query, timestamp: new Date().toLocaleTimeString() }]);
-    };
-
-    const handleEnrollClick = (curso: Curso) => {
-        setEnrollmentModal({ isOpen: true, curso });
+    }; const handleEnrollClick = (curso: Curso) => {
+        if (useNewEnrollmentFlow) {
+            setEnrollmentFlow({
+                isOpen: true,
+                courseName: curso.titulo,
+                coursePrice: 299.90, // Default price, could be from curso data
+                courseId: curso.id
+            });
+        } else {
+            setEnrollmentModal({ isOpen: true, curso });
+        }
     };
 
     const closeEnrollmentModal = () => {
         setEnrollmentModal({ isOpen: false, curso: null });
+    };
+
+    const closeEnrollmentFlow = () => {
+        setEnrollmentFlow(prev => ({ ...prev, isOpen: false }));
     };
 
     useEffect(() => {
@@ -137,9 +155,7 @@ export default function CoursesSection() {
                     <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
                         Nossos cursos são organizados pelas áreas do ENEM. Selecione as matérias que mais precisa estudar.
                     </p>
-                </div>
-
-                {/* Query Display Toggle */}
+                </div>                {/* Query Display Toggle */}
                 <div className="mb-8 text-center">
                     <button
                         onClick={() => setShowQueries(!showQueries)}
@@ -147,6 +163,31 @@ export default function CoursesSection() {
                     >
                         <span>🗄️ {showQueries ? 'Ocultar' : 'Mostrar'} Queries do Banco</span>
                     </button>
+                </div>
+
+                {/* Enrollment Method Toggle */}
+                <div className="mb-8 text-center">
+                    <div className="inline-flex items-center space-x-4 bg-blue-50 dark:bg-slate-700 p-2 rounded-lg">
+                        <span className="text-sm text-gray-600 dark:text-gray-300">Método de Matrícula:</span>
+                        <button
+                            onClick={() => setUseNewEnrollmentFlow(false)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!useNewEnrollmentFlow
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-transparent text-blue-600 hover:bg-blue-100 dark:hover:bg-slate-600'
+                                }`}
+                        >
+                            Modal Clássico
+                        </button>
+                        <button
+                            onClick={() => setUseNewEnrollmentFlow(true)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${useNewEnrollmentFlow
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-transparent text-blue-600 hover:bg-blue-100 dark:hover:bg-slate-600'
+                                }`}
+                        >
+                            Fluxo Completo (Novo!)
+                        </button>
+                    </div>
                 </div>
 
                 {/* Query Display */}
@@ -273,13 +314,20 @@ export default function CoursesSection() {
                             Ver Todos os Cursos ({cursos.length})
                         </button>                    </div>
                 )}
-            </div>
-
-            {/* Enrollment Modal */}
+            </div>            {/* Enrollment Modal */}
             <EnrollmentModal
                 isOpen={enrollmentModal.isOpen}
                 onClose={closeEnrollmentModal}
                 curso={enrollmentModal.curso}
+            />
+
+            {/* Enrollment Flow */}
+            <EnrollmentFlow
+                isOpen={enrollmentFlow.isOpen}
+                onClose={closeEnrollmentFlow}
+                courseName={enrollmentFlow.courseName}
+                coursePrice={enrollmentFlow.coursePrice}
+                courseId={enrollmentFlow.courseId}
             />
         </section>
     );
