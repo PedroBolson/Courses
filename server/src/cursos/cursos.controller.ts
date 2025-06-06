@@ -8,13 +8,15 @@ export class CursosController {
   @Post()
   create(
     @Body()
-    body: { titulo: string; descricao: string; professor_id: number; area_id: number }
+    body: { titulo: string; descricao: string; professor_id: number; area_id: number, duracao_horas: number; valor: number }
   ) {
     return this.cursosService.create(
       body.titulo,
       body.descricao,
       body.professor_id,
-      body.area_id
+      body.area_id,
+      body.duracao_horas,
+      body.valor
     );
   }
 
@@ -32,14 +34,16 @@ export class CursosController {
   update(
     @Param('id') id: string,
     @Body()
-    body: { titulo: string; descricao: string; professor_id: number; area_id: number }
+    body: { titulo: string; descricao: string; professor_id: number; area_id: number, duracao_horas: number; valor: number }
   ) {
     return this.cursosService.update(
       +id,
       body.titulo,
       body.descricao,
       body.professor_id,
-      body.area_id
+      body.area_id,
+      body.duracao_horas,
+      body.valor
     );
   }
 

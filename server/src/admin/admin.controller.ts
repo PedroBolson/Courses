@@ -1,9 +1,14 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Get, Put, Delete, Param } from '@nestjs/common';
 import { AdminService } from './admin.service';
 
 @Controller('admin')
 export class AdminController {
   constructor(private adminService: AdminService) { }
+
+  @Get()
+  async getAllAdmins() {
+    return this.adminService.getAllAdmins();
+  }
 
   @Post('register')
   async register(@Body() body: { username: string; password: string }) {
@@ -21,5 +26,15 @@ export class AdminController {
       admin: valid,
       executedQuery: `SELECT * FROM security.Admins WHERE username = '${body.username}'`
     };
+  }
+
+  @Put(':id')
+  async updateAdmin(@Param('id') id: string, @Body() body: { username: string; password?: string }) {
+    return this.adminService.updateAdmin(parseInt(id), body.username, body.password);
+  }
+
+  @Delete(':id')
+  async deleteAdmin(@Param('id') id: string) {
+    return this.adminService.deleteAdmin(parseInt(id));
   }
 }

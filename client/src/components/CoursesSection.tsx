@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, Clock, ChevronRight } from 'lucide-react';
-import EnrollmentModal from './EnrollmentModal';
 import EnrollmentFlow from './EnrollmentFlow';
+import { useQuery } from '@/contexts/QueryContext';
 import { fixObjectEncoding } from '@/utils/textUtils';
 
 interface Area {
@@ -25,15 +25,12 @@ interface Curso {
     id: number;
     titulo: string;
     descricao: string;
+    duracao_horas: number;
+    valor: number;
     professor_id: number;
     area_id: number;
     professor?: Professor;
     area?: Area;
-}
-
-interface QueryDisplay {
-    query: string;
-    timestamp: string;
 }
 
 export default function CoursesSection() {
@@ -41,37 +38,22 @@ export default function CoursesSection() {
     const [cursos, setCursos] = useState<Curso[]>([]);
     const [professores, setProfessores] = useState<Professor[]>([]);
     const [selectedArea, setSelectedArea] = useState<number | null>(null);
-    const [queries, setQueries] = useState<QueryDisplay[]>([]);
-    const [showQueries, setShowQueries] = useState(false); const [loading, setLoading] = useState(true);
-    const [enrollmentModal, setEnrollmentModal] = useState<{ isOpen: boolean; curso: Curso | null }>({
-        isOpen: false,
-        curso: null
-    });
+    const [loading, setLoading] = useState(true);
     const [enrollmentFlow, setEnrollmentFlow] = useState<{ isOpen: boolean; courseName: string; coursePrice: number; courseId: number }>({
         isOpen: false,
         courseName: '',
         coursePrice: 299.90,
         courseId: 1
     });
-    const [useNewEnrollmentFlow, setUseNewEnrollmentFlow] = useState(false);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; const addQuery = (query: string) => {
-        setQueries(prev => [...prev, { query, timestamp: new Date().toLocaleTimeString() }]);
-    }; const handleEnrollClick = (curso: Curso) => {
-        if (useNewEnrollmentFlow) {
-            setEnrollmentFlow({
-                isOpen: true,
-                courseName: curso.titulo,
-                coursePrice: 299.90, // Default price, could be from curso data
-                courseId: curso.id
-            });
-        } else {
-            setEnrollmentModal({ isOpen: true, curso });
-        }
-    };
-
-    const closeEnrollmentModal = () => {
-        setEnrollmentModal({ isOpen: false, curso: null });
+    const { addQuery } = useQuery();
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; const handleEnrollClick = (curso: Curso) => {
+        setEnrollmentFlow({
+            isOpen: true,
+            courseName: curso.titulo,
+            coursePrice: curso.valor || 299.90,
+            courseId: curso.id
+        });
     };
 
     const closeEnrollmentFlow = () => {
@@ -81,21 +63,25 @@ export default function CoursesSection() {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                setLoading(true);                // Fetch areas
+                setLoading(true);
+
+                // Fetch areas
                 const areasResponse = await fetch(`${API_URL}/areas`);
                 const areasData = await areasResponse.json();
                 setAreas(fixObjectEncoding(areasData.rows || []));
-                addQuery(areasData.executedQuery || 'SELECT * FROM catalogo.Areas');
+                if (areasData.executedQuery) addQuery(areasData.executedQuery, 'GET /areas');
 
                 // Fetch cursos
                 const cursosResponse = await fetch(`${API_URL}/cursos`);
                 const cursosData = await cursosResponse.json();
                 setCursos(fixObjectEncoding(cursosData.rows || []));
-                addQuery(cursosData.executedQuery || 'SELECT * FROM catalogo.Cursos');                // Fetch professores
+                if (cursosData.executedQuery) addQuery(cursosData.executedQuery, 'GET /cursos');
+
+                // Fetch professores
                 const professoresResponse = await fetch(`${API_URL}/professores`);
                 const professoresData = await professoresResponse.json();
                 setProfessores(fixObjectEncoding(professoresData.rows || []));
-                addQuery(professoresData.executedQuery || 'SELECT * FROM security.Professores p JOIN catalogo.Pessoas pe ON p.pessoa_id = pe.id');
+                if (professoresData.executedQuery) addQuery(professoresData.executedQuery, 'GET /professores');
 
             } catch (error) {
                 console.error('Error fetching data:', error);
@@ -103,7 +89,7 @@ export default function CoursesSection() {
                 setLoading(false);
             }
         }; fetchData();
-    }, [API_URL]);
+    }, [API_URL, addQuery]);
 
     const getAreaIcon = (areaName: string) => {
         const name = areaName.toLowerCase();
@@ -146,8 +132,7 @@ export default function CoursesSection() {
 
     return (
         <section id="cursos" className="py-20 bg-gray-50 dark:bg-slate-800 relative">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">                {/* Header */}
                 <div className="text-center mb-16">
                     <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-4">
                         Escolha Sua Área de Conhecimento
@@ -155,52 +140,7 @@ export default function CoursesSection() {
                     <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
                         Nossos cursos são organizados pelas áreas do ENEM. Selecione as matérias que mais precisa estudar.
                     </p>
-                </div>                {/* Query Display Toggle */}
-                <div className="mb-8 text-center">
-                    <button
-                        onClick={() => setShowQueries(!showQueries)}
-                        className="inline-flex items-center space-x-2 bg-yellow-100 dark:bg-yellow-900/50 text-yellow-800 dark:text-yellow-200 px-4 py-2 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/70 transition-colors"
-                    >
-                        <span>🗄️ {showQueries ? 'Ocultar' : 'Mostrar'} Queries do Banco</span>
-                    </button>
                 </div>
-
-                {/* Enrollment Method Toggle */}
-                <div className="mb-8 text-center">
-                    <div className="inline-flex items-center space-x-4 bg-blue-50 dark:bg-slate-700 p-2 rounded-lg">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">Método de Matrícula:</span>
-                        <button
-                            onClick={() => setUseNewEnrollmentFlow(false)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${!useNewEnrollmentFlow
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-transparent text-blue-600 hover:bg-blue-100 dark:hover:bg-slate-600'
-                                }`}
-                        >
-                            Modal Clássico
-                        </button>
-                        <button
-                            onClick={() => setUseNewEnrollmentFlow(true)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${useNewEnrollmentFlow
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-transparent text-blue-600 hover:bg-blue-100 dark:hover:bg-slate-600'
-                                }`}
-                        >
-                            Fluxo Completo (Novo!)
-                        </button>
-                    </div>
-                </div>
-
-                {/* Query Display */}
-                {showQueries && (
-                    <div className="mb-8 bg-gray-900 dark:bg-gray-800 rounded-lg p-4 text-green-400 font-mono text-sm max-h-40 overflow-y-auto">
-                        <h3 className="text-green-300 font-bold mb-2">📊 Queries Executadas:</h3>
-                        {queries.map((q, index) => (
-                            <div key={index} className="mb-2">
-                                <span className="text-gray-400">[{q.timestamp}]</span> {q.query}
-                            </div>
-                        ))}
-                    </div>
-                )}
 
                 {/* Areas Filter */}
                 <div className="mb-12">
@@ -278,9 +218,7 @@ export default function CoursesSection() {
                                                 </div>
                                             </div>
                                         </div>
-                                    )}
-
-                                    {/* Course Stats */}
+                                    )}                                    {/* Course Stats */}
                                     <div className="flex items-center justify-between mb-4 text-sm text-gray-500 dark:text-gray-400">
                                         <div className="flex items-center space-x-1">
                                             <BookOpen className="h-4 w-4" />
@@ -288,12 +226,12 @@ export default function CoursesSection() {
                                         </div>
                                         <div className="flex items-center space-x-1">
                                             <Clock className="h-4 w-4" />
-                                            <span>3 meses</span>
+                                            <span>{curso.duracao_horas || 40}h</span>
                                         </div>
                                         <div className="text-green-600 dark:text-green-400 font-medium">
-                                            R$ 299
+                                            R$ {curso.valor ? curso.valor.toFixed(2) : '299,90'}
                                         </div>
-                                    </div>                                    {/* CTA Button */}
+                                    </div>{/* CTA Button */}
                                     <button
                                         onClick={() => handleEnrollClick(curso)}
                                         className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg font-medium transition-colors inline-flex items-center justify-center space-x-2 group-hover:bg-blue-700"
@@ -313,13 +251,7 @@ export default function CoursesSection() {
                         <button className="bg-white dark:bg-slate-700 border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white dark:hover:bg-blue-600 px-8 py-3 rounded-lg font-medium transition-colors">
                             Ver Todos os Cursos ({cursos.length})
                         </button>                    </div>
-                )}
-            </div>            {/* Enrollment Modal */}
-            <EnrollmentModal
-                isOpen={enrollmentModal.isOpen}
-                onClose={closeEnrollmentModal}
-                curso={enrollmentModal.curso}
-            />
+                )}            </div>
 
             {/* Enrollment Flow */}
             <EnrollmentFlow

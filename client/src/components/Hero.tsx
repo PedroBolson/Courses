@@ -5,6 +5,19 @@ import { ArrowRight, Star, Users, BookOpen, Trophy } from 'lucide-react';
 import { useQuery } from '@/contexts/QueryContext';
 import { fixObjectEncoding } from '@/utils/textUtils';
 import EnrollmentFlow from './EnrollmentFlow';
+import CourseSelector from './CourseSelector';
+
+interface Curso {
+    id: number;
+    titulo: string;
+    descricao: string;
+    duracao_horas: number;
+    valor: number;
+    professor_id: number;
+    area_id: number;
+    nome_professor?: string;
+    nome_area?: string;
+}
 
 export default function Hero() {
     const [stats, setStats] = useState({
@@ -12,23 +25,36 @@ export default function Hero() {
         cursos: 0,
         aprovacao: 95
     });
+    const [activeUsers, setActiveUsers] = useState([
+        { id: 1, name: 'Maria S.', course: 'Matemática', status: 'online' },
+        { id: 2, name: 'João P.', course: 'Física', status: 'studying' },
+        { id: 3, name: 'Ana L.', course: 'Química', status: 'online' },
+        { id: 4, name: 'Pedro M.', course: 'Biologia', status: 'studying' },
+        { id: 5, name: 'Carla F.', course: 'História', status: 'online' }
+    ]);
+    const [courseSelectorOpen, setCourseSelectorOpen] = useState(false);
     const [enrollmentFlow, setEnrollmentFlow] = useState({
         isOpen: false,
         courseName: 'Curso ENEM Preparatório',
         coursePrice: 299.90,
         courseId: 1
     });
-    const { addQuery } = useQuery();
+    const { addQuery } = useQuery(); const handleChooseCourse = () => {
+        setCourseSelectorOpen(true);
+    };
 
-    const handleChooseCourse = () => {
-        setEnrollmentFlow(prev => ({ ...prev, isOpen: true }));
+    const handleCourseSelect = (curso: Curso) => {
+        setEnrollmentFlow({
+            isOpen: true,
+            courseName: curso.titulo,
+            coursePrice: curso.valor || 299.90,
+            courseId: curso.id
+        });
     };
 
     const handleCloseEnrollment = () => {
         setEnrollmentFlow(prev => ({ ...prev, isOpen: false }));
-    };
-
-    useEffect(() => {
+    }; useEffect(() => {
         const fetchStats = async () => {
             try {                // Fetch alunos count
                 const alunosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/alunos`);
@@ -50,6 +76,16 @@ export default function Hero() {
         };
 
         fetchStats();
+
+        // Simulate active users updates
+        const interval = setInterval(() => {
+            setActiveUsers(prev => prev.map(user => ({
+                ...user,
+                status: Math.random() > 0.7 ? (user.status === 'online' ? 'studying' : 'online') : user.status
+            })));
+        }, 3000);
+
+        return () => clearInterval(interval);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Intencionalmente não incluindo addQuery para evitar loop infinito
     return (
@@ -105,6 +141,44 @@ export default function Hero() {
                                 </div>
                                 <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.aprovacao}%</div>
                                 <div className="text-sm text-gray-600 dark:text-gray-400">Taxa de Aprovação</div>
+                            </div>                        </div>
+
+                        {/* Active Users Demo */}
+                        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 shadow-lg">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {activeUsers.length} usuários estudando agora
+                                    </span>
+                                </div>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">Tempo real</span>
+                            </div>
+                            <div className="space-y-3">
+                                {activeUsers.slice(0, 3).map((user) => (
+                                    <div key={user.id} className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                                {user.name.charAt(0)}
+                                            </div>
+                                            <div>
+                                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                    {user.name}
+                                                </div>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {user.course}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-1">
+                                            <div className={`w-2 h-2 rounded-full ${user.status === 'online' ? 'bg-green-500' : 'bg-blue-500'
+                                                }`}></div>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                {user.status === 'online' ? 'Online' : 'Estudando'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
@@ -161,15 +235,20 @@ export default function Hero() {
                         </div>
                     </div>
                 </div>
-            </div>
-
-            {/* Enrollment Flow Component */}
+            </div>            {/* Enrollment Flow Component */}
             <EnrollmentFlow
                 isOpen={enrollmentFlow.isOpen}
                 onClose={handleCloseEnrollment}
                 courseName={enrollmentFlow.courseName}
                 coursePrice={enrollmentFlow.coursePrice}
                 courseId={enrollmentFlow.courseId}
+            />
+
+            {/* Course Selector Modal */}
+            <CourseSelector
+                isOpen={courseSelectorOpen}
+                onClose={() => setCourseSelectorOpen(false)}
+                onSelectCourse={handleCourseSelect}
             />
         </section>
     );

@@ -13,15 +13,31 @@ export default function Header({ darkMode, toggleDarkMode }: HeaderProps) {
     const [isScrolled, setIsScrolled] = useState(false);
     const [showStudentLogin, setShowStudentLogin] = useState(false);
     const [showMobileMenu, setShowMobileMenu] = useState(false);
+    const [activeSection, setActiveSection] = useState('inicio');
 
     useEffect(() => {
         const handleScroll = () => {
             setIsScrolled(window.scrollY > 10);
+
+            // Detectar seção ativa
+            const sections = ['inicio', 'areas-cursos', 'palestras', 'avaliacoes'];
+            for (const section of sections) {
+                const element = document.getElementById(section);
+                if (element) {
+                    const rect = element.getBoundingClientRect();
+                    if (rect.top <= 100 && rect.bottom >= 100) {
+                        setActiveSection(section);
+                        break;
+                    }
+                }
+            }
         };
 
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
+
+    const isActive = (section: string) => activeSection === section;
 
     return (
         <header className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled
@@ -38,21 +54,55 @@ export default function Header({ darkMode, toggleDarkMode }: HeaderProps) {
                         <span className="text-xl font-bold text-gray-900 dark:text-white">
                             ENEM Pro
                         </span>
-                    </div>
-
-                    {/* Navigation */}
+                    </div>                    {/* Navigation */}
                     <nav className="hidden md:flex items-center space-x-8">
-                        <a href="#cursos" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                            Cursos
+                        <a
+                            href="#inicio"
+                            className={`relative py-2 transition-colors ${isActive('inicio')
+                                ? 'text-blue-600 dark:text-blue-400 font-medium'
+                                : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                                }`}
+                        >
+                            Início
+                            {isActive('inicio') && (
+                                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
+                            )}
                         </a>
-                        <a href="#areas" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                            Áreas
+                        <a
+                            href="#areas-cursos"
+                            className={`relative py-2 transition-colors ${isActive('areas-cursos')
+                                ? 'text-blue-600 dark:text-blue-400 font-medium'
+                                : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                                }`}
+                        >
+                            Áreas & Cursos
+                            {isActive('areas-cursos') && (
+                                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
+                            )}
                         </a>
-                        <a href="#professores" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                            Professores
-                        </a>
-                        <a href="#palestras" className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                        <a
+                            href="#palestras"
+                            className={`relative py-2 transition-colors ${isActive('palestras')
+                                ? 'text-blue-600 dark:text-blue-400 font-medium'
+                                : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                                }`}
+                        >
                             Palestras
+                            {isActive('palestras') && (
+                                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
+                            )}
+                        </a>
+                        <a
+                            href="#avaliacoes"
+                            className={`relative py-2 transition-colors ${isActive('avaliacoes')
+                                ? 'text-blue-600 dark:text-blue-400 font-medium'
+                                : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                                }`}
+                        >
+                            Avaliações
+                            {isActive('avaliacoes') && (
+                                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
+                            )}
                         </a>
                     </nav>
 
@@ -101,47 +151,58 @@ export default function Header({ darkMode, toggleDarkMode }: HeaderProps) {
 
             {/* Mobile Menu */}
             {showMobileMenu && (
-                <div className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-gray-700">
-                    <div className="px-4 py-4 space-y-3">
-                        <a
-                            href="#cursos"
-                            className="block text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            onClick={() => setShowMobileMenu(false)}
-                        >
-                            Cursos
-                        </a>
-                        <a
-                            href="#areas"
-                            className="block text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            onClick={() => setShowMobileMenu(false)}
-                        >
-                            Áreas
-                        </a>
-                        <a
-                            href="#professores"
-                            className="block text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            onClick={() => setShowMobileMenu(false)}
-                        >
-                            Professores
-                        </a>
-                        <a
-                            href="#palestras"
-                            className="block text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            onClick={() => setShowMobileMenu(false)}
-                        >
-                            Palestras
-                        </a>
-                        <button
-                            onClick={() => {
-                                setShowStudentLogin(true);
-                                setShowMobileMenu(false);
-                            }}
-                            className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                        >
-                            <User className="h-4 w-4" />
-                            <span>Portal do Aluno</span>
-                        </button>
-                    </div>
+                <div className="md:hidden bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-gray-700">                    <div className="px-4 py-4 space-y-3">
+                    <a
+                        href="#inicio"
+                        className={`block transition-colors ${isActive('inicio')
+                            ? 'text-blue-600 dark:text-blue-400 font-medium'
+                            : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                            }`}
+                        onClick={() => setShowMobileMenu(false)}
+                    >
+                        Início
+                    </a>
+                    <a
+                        href="#areas-cursos"
+                        className={`block transition-colors ${isActive('areas-cursos')
+                            ? 'text-blue-600 dark:text-blue-400 font-medium'
+                            : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                            }`}
+                        onClick={() => setShowMobileMenu(false)}
+                    >
+                        Áreas & Cursos
+                    </a>
+                    <a
+                        href="#palestras"
+                        className={`block transition-colors ${isActive('palestras')
+                            ? 'text-blue-600 dark:text-blue-400 font-medium'
+                            : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                            }`}
+                        onClick={() => setShowMobileMenu(false)}
+                    >
+                        Palestras
+                    </a>
+                    <a
+                        href="#avaliacoes"
+                        className={`block transition-colors ${isActive('avaliacoes')
+                            ? 'text-blue-600 dark:text-blue-400 font-medium'
+                            : 'text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400'
+                            }`}
+                        onClick={() => setShowMobileMenu(false)}
+                    >
+                        Avaliações
+                    </a>
+                    <button
+                        onClick={() => {
+                            setShowStudentLogin(true);
+                            setShowMobileMenu(false);
+                        }}
+                        className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                        <User className="h-4 w-4" />
+                        <span>Portal do Aluno</span>
+                    </button>
+                </div>
                 </div>
             )}
 

@@ -28,4 +28,35 @@ export class AdminService {
     const match = await bcrypt.compare(password, admin.password_hash);
     return match ? { id: admin.id, username: admin.username } : false;
   }
+
+  // Listar todos os admins
+  async getAllAdmins() {
+    const query = `SELECT id, username FROM security.Admins`;
+    return this.db.executeQuery(query, []);
+  }
+
+  // Atualizar admin
+  async updateAdmin(id: number, username: string, password?: string) {
+    if (password) {
+      const saltRounds = 10;
+      const hashed = await bcrypt.hash(password, saltRounds);
+      const query = `
+        UPDATE security.Admins 
+        SET username = @param0, password_hash = @param1 
+        WHERE id = @param2`;
+      return this.db.executeQuery(query, [username, hashed, id]);
+    } else {
+      const query = `
+        UPDATE security.Admins 
+        SET username = @param0 
+        WHERE id = @param1`;
+      return this.db.executeQuery(query, [username, id]);
+    }
+  }
+
+  // Deletar admin
+  async deleteAdmin(id: number) {
+    const query = `DELETE FROM security.Admins WHERE id = @param0`;
+    return this.db.executeQuery(query, [id]);
+  }
 }

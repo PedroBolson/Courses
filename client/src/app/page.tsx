@@ -6,7 +6,6 @@ import Hero from '@/components/Hero';
 import CoursesSection from '@/components/CoursesSection';
 import PalestrasSection from '@/components/PalestrasSection';
 import TestimonialsSection from '@/components/TestimonialsSection';
-import PricingSection from '@/components/PricingSection';
 import FAQSection from '@/components/FAQSection';
 import Footer from '@/components/Footer';
 import AdminLogin from '@/components/AdminLogin';
@@ -52,12 +51,30 @@ function HomeContent() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-900 transition-colors duration-300">
       <Header darkMode={darkMode} toggleDarkMode={toggleDarkMode} />
-      <Hero />
-      <CoursesSection />
-      <PalestrasSection />
-      <TestimonialsSection />
-      <PricingSection />
+      
+      {/* Início */}
+      <section id="inicio">
+        <Hero />
+      </section>
+      
+      {/* Áreas & Cursos */}
+      <section id="areas-cursos">
+        <CoursesSection />
+      </section>
+      
+      {/* Palestras */}
+      <section id="palestras">
+        <PalestrasSection />
+      </section>
+      
+      {/* Avaliações */}
+      <section id="avaliacoes">
+        <TestimonialsSection />
+      </section>
+      
+      {/* FAQ */}
       <FAQSection />
+      
       <Footer onAdminClick={openAdminLogin} />
 
       <AdminLogin

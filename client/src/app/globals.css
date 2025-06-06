@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   /* Cores principais */
@@ -45,6 +46,11 @@
 /* Garantir que o dark mode funcione corretamente */
 .dark {
   color-scheme: dark;
+}
+
+/* Scroll suave para navegação */
+html {
+  scroll-behavior: smooth;
 }
 
 body {

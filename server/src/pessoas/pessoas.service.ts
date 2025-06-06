@@ -5,12 +5,12 @@ import { DatabaseService } from '../database/database.service';
 export class PessoasService {
   constructor(private db: DatabaseService) { }
   // Cria nova Pessoa (insert em catalogo.Pessoas)
-  async create(nome: string, email: string, telefone: string) {
+  async create(nome: string, email: string, telefone: string, cpf: string) {
     const query = `
-      INSERT INTO catalogo.Pessoas (nome, email, telefone)
+      INSERT INTO catalogo.Pessoas (nome, email, telefone, cpf)	
       OUTPUT INSERTED.id
-      VALUES (@param0, @param1, @param2)`;
-    return this.db.executeQuery(query, [nome, email, telefone]);
+      VALUES (@param0, @param1, @param2, @param3)`;
+    return this.db.executeQuery(query, [nome, email, telefone, cpf]);
   }
 
   // Lista todas as Pessoas
@@ -26,12 +26,12 @@ export class PessoasService {
   }
 
   // Atualiza uma Pessoa
-  async update(id: number, nome: string, email: string, telefone: string) {
+  async update(id: number, nome: string, email: string, telefone: string, cpf: string) {
     const query = `
       UPDATE catalogo.Pessoas
-      SET nome = @param1, email = @param2, telefone = @param3
+      SET nome = @param1, email = @param2, telefone = @param3, cpf = @param4
       WHERE id = @param0`;
-    return this.db.executeQuery(query, [id, nome, email, telefone]);
+    return this.db.executeQuery(query, [id, nome, email, telefone, cpf]);
   }
 
   // Remove uma Pessoa

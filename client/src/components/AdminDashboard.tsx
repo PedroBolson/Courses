@@ -20,7 +20,7 @@ interface DashboardStats {
 interface Aluno {
     id: number;
     pessoa_id: number;
-    status: string;
+    status_pagamento: string;
     data_matricula: string;
     nome?: string;
     email?: string;
@@ -33,6 +33,8 @@ interface Curso {
     descricao: string;
     professor_id: number;
     area_id: number;
+    duracao_horas: number;
+    valor: number;
     nome_professor?: string;
     nome_area?: string;
 }
@@ -72,10 +74,16 @@ interface Professor {
     telefone?: string;
 }
 
-type DataItem = Aluno | Curso | Palestra | Pessoa | Area | Professor;
+interface Admin {
+    id: number;
+    username: string;
+    password_hash?: string;
+}
+
+type DataItem = Aluno | Curso | Palestra | Pessoa | Area | Professor | Admin;
 type FormDataType = Record<string, string | number | undefined>;
 
-type ManagementSection = 'overview' | 'pessoas' | 'alunos' | 'professores' | 'palestras' | 'areas' | 'cursos';
+type ManagementSection = 'overview' | 'pessoas' | 'alunos' | 'professores' | 'palestras' | 'areas' | 'cursos' | 'admins';
 type ActionMode = 'list' | 'create' | 'edit' | 'view';
 
 export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps) {
@@ -90,14 +98,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
     const [actionMode, setActionMode] = useState<ActionMode>('list'); const [selectedItem, setSelectedItem] = useState<DataItem | null>(null);    // Data states
     const [alunos, setAlunos] = useState<Aluno[]>([]);
     const [cursos, setCursos] = useState<Curso[]>([]);
-    const [palestras, setPalestras] = useState<Palestra[]>([]);
-    const [pessoas, setPessoas] = useState<Pessoa[]>([]);
+    const [palestras, setPalestras] = useState<Palestra[]>([]); const [pessoas, setPessoas] = useState<Pessoa[]>([]);
     const [areas, setAreas] = useState<Area[]>([]);
     const [professores, setProfessores] = useState<Professor[]>([]);
+    const [admins, setAdmins] = useState<Admin[]>([]);
 
     // Form states
     const [formData, setFormData] = useState<FormDataType>({});
-    const [formLoading, setFormLoading] = useState(false);
+    const [formLoading, setFormLoading] = useState(false);    // Current admin info (simulated - in real app would come from auth)
+    const [currentAdmin] = useState({ id: 1, username: 'admin' });
 
     const { addQuery } = useQuery();
 
@@ -144,18 +153,30 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
         } finally {
             setLoading(false);
         }
-    };
-
-    const fetchSectionData = async (section: ManagementSection) => {
+    };    const fetchSectionData = async (section: ManagementSection) => {
         if (section === 'overview') return;
 
         try {
             setLoading(true);
+            
+            // Special handling for admins - use different endpoint
+            if (section === 'admins') {
+                const adminResponse = await fetch(`${API_URL}/admin`);
+                const adminData = await adminResponse.json();
+                const fixedAdminData = fixObjectEncoding(adminData);
+                setAdmins(fixedAdminData.rows || []);
+                addQuery(fixedAdminData.executedQuery || 'SELECT id, username FROM security.Admins', 'GET /admin');
+                return;
+            }
+
+            // Generic handling for other sections
             const response = await fetch(`${API_URL}/${section}`);
             const data = await response.json();
             const fixedData = fixObjectEncoding(data);
 
-            addQuery(fixedData.executedQuery || `SELECT * FROM ${section}`, `GET /${section}`); switch (section) {
+            addQuery(fixedData.executedQuery || `SELECT * FROM ${section}`, `GET /${section}`);
+
+            switch (section) {
                 case 'alunos':
                     setAlunos(fixedData.rows || []);
                     break;
@@ -226,14 +247,17 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
     const handleView = (item: DataItem) => {
         setActionMode('view');
         setSelectedItem(item);
-    };
+    }; const handleDelete = async (id: number) => {
+        // Special handling for admins - prevent self-deletion
+        if (currentSection === 'admins' && id === currentAdmin.id) {
+            alert('Você não pode excluir sua própria conta de administrador!');
+            return;
+        }
 
-    const handleDelete = async (id: number) => {
-        if (!confirm('Tem certeza que deseja excluir este item?')) return;
-
-        try {
+        if (!confirm('Tem certeza que deseja excluir este item?')) return; try {
             setFormLoading(true);
-            const response = await fetch(`${API_URL}/${currentSection}/${id}`, {
+
+            const response = await fetch(`${API_URL}/${currentSection === 'admins' ? 'admin' : currentSection}/${id}`, {
                 method: 'DELETE'
             });
 
@@ -250,9 +274,25 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
     }; const handleSave = async () => {
         try {
             setFormLoading(true);
+
             const isEdit = actionMode === 'edit';
-            const url = isEdit && selectedItem ? `${API_URL}/${currentSection}/${selectedItem.id}` : `${API_URL}/${currentSection}`;
-            const method = isEdit ? 'PUT' : 'POST';
+            let url: string;
+            let method: string;
+
+            if (currentSection === 'admins') {
+                if (isEdit && selectedItem) {
+                    // Update existing admin
+                    url = `${API_URL}/admin/${selectedItem.id}`;
+                    method = 'PUT';
+                } else {
+                    // Create new admin
+                    url = `${API_URL}/admin/register`;
+                    method = 'POST';
+                }
+            } else {
+                url = isEdit && selectedItem ? `${API_URL}/${currentSection}/${selectedItem.id}` : `${API_URL}/${currentSection}`;
+                method = isEdit ? 'PUT' : 'POST';
+            }
 
             const response = await fetch(url, {
                 method,
@@ -274,17 +314,16 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
     }; const getEmptyFormData = (section: ManagementSection): FormDataType => {
         switch (section) {
             case 'alunos':
-                return { pessoa_id: '', senha: '' };
-            case 'cursos':
-                return { titulo: '', descricao: '', professor_id: '', area_id: '' };
+                return { pessoa_id: '', senha: '' }; case 'cursos':
+                return { titulo: '', descricao: '', professor_id: '', area_id: '', duracao_horas: '', valor: '' };
             case 'palestras':
                 return { titulo: '', descricao: '', data_hora: '', local: '', convidado_id: '', area_id: '' };
             case 'pessoas':
                 return { nome: '', email: '', telefone: '' };
             case 'areas':
-                return { nome_area: '', descricao: '' };
-            case 'professores':
-                return { pessoa_id: '', especialidade: '', data_contratacao: '' };
+                return { nome_area: '', descricao: '' }; case 'professores':
+                return { pessoa_id: '', especialidade: '', data_contratacao: '' }; case 'admins':
+                return { username: '', password: '' };
             default:
                 return {};
         }
@@ -355,10 +394,9 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                     Status
-                                </label>
-                                <select
-                                    value={formData.status || ''}
-                                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                </label>                                <select
+                                    value={formData.status_pagamento || ''}
+                                    onChange={(e) => setFormData({ ...formData, status_pagamento: e.target.value })}
                                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
                                 >
                                     <option value="ativo">Ativo</option>
@@ -368,8 +406,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                             </div>
                         )}
                     </>
-                );
-            case 'cursos':
+                ); case 'cursos':
                 return (
                     <>
                         <div>
@@ -395,6 +432,18 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                 Área
                             </label>
                             {renderFormField('area_id', formData.area_id, 'select')}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Duração (horas)
+                            </label>
+                            {renderFormField('duracao_horas', formData.duracao_horas, 'number')}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Valor (R$)
+                            </label>
+                            {renderFormField('valor', formData.valor, 'number')}
                         </div>
                     </>
                 );
@@ -477,8 +526,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                             {renderFormField('descricao', formData.descricao, 'textarea')}
                         </div>
                     </>
-                );
-            case 'professores':
+                ); case 'professores':
                 return (
                     <>
                         <div>
@@ -501,6 +549,23 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                         </div>
                     </>
                 );
+            case 'admins':
+                return (
+                    <>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Nome de Usuário
+                            </label>
+                            {renderFormField('username', formData.username)}
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Senha
+                            </label>
+                            {renderFormField('password', formData.password, 'password')}
+                        </div>
+                    </>
+                );
             default:
                 return null;
         }
@@ -510,10 +575,9 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
             case 'alunos':
                 data = alunos;
                 columns = ['ID', 'Nome', 'Email', 'Status', 'Data Matrícula'];
-                break;
-            case 'cursos':
+                break; case 'cursos':
                 data = cursos;
-                columns = ['ID', 'Título', 'Professor', 'Área'];
+                columns = ['ID', 'Título', 'Professor', 'Área', 'Duração (h)', 'Valor (R$)'];
                 break;
             case 'palestras':
                 data = palestras;
@@ -526,10 +590,12 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
             case 'areas':
                 data = areas;
                 columns = ['ID', 'Nome da Área', 'Descrição'];
-                break;
-            case 'professores':
+                break; case 'professores':
                 data = professores;
                 columns = ['ID', 'Nome', 'Email', 'Especialidade', 'Data Contratação'];
+                break; case 'admins':
+                data = admins;
+                columns = ['ID', 'Username'];
                 break;
         }
 
@@ -568,26 +634,56 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                         <>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Aluno).nome || 'N/A'}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Aluno).email || 'N/A'}</td>
-                                            <td className="px-4 py-3 text-sm">
-                                                <span className={`px-2 py-1 rounded-full text-xs font-medium ${(item as Aluno).status === 'ativo' ? 'bg-green-100 text-green-800' :
-                                                    (item as Aluno).status === 'inativo' ? 'bg-gray-100 text-gray-800' :
-                                                        'bg-red-100 text-red-800'
-                                                    }`}>
-                                                    {(item as Aluno).status}
-                                                </span>
+                                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Aluno).email || 'N/A'}</td>                                            <td className="px-4 py-3 text-sm">
+                                                <select
+                                                    value={(item as Aluno).status_pagamento || 'ativo'}                                                    onChange={async (e) => {
+                                                        const newStatus = e.target.value;
+                                                        try {
+                                                            const response = await fetch(`${API_URL}/alunos/${item.id}/status`, {
+                                                                method: 'PUT',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({ status: newStatus })
+                                                            });
+                                                            if (response.ok) {
+                                                                const data = await response.json();
+                                                                addQuery(data.executedQuery || `UPDATE alunos SET status_pagamento = '${newStatus}' WHERE id = ${item.id}`, `PUT /alunos/${item.id}/status`);
+                                                                await fetchSectionData('alunos');
+                                                            }
+                                                        } catch (error) {
+                                                            console.error('Error updating status:', error);
+                                                        }
+                                                    }}
+                                                    className="flex items-center space-x-2 px-3 py-1 rounded-lg text-sm font-medium border-0 bg-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
+                                                    style={{
+                                                        color: (item as Aluno).status_pagamento === 'ativo' ? '#059669' : 
+                                                               (item as Aluno).status_pagamento === 'inativo' ? '#6b7280' : '#dc2626',
+                                                        appearance: 'none',
+                                                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
+                                                        backgroundPosition: 'right 0.5rem center',
+                                                        backgroundRepeat: 'no-repeat',
+                                                        backgroundSize: '1.5em 1.5em',
+                                                        paddingRight: '2.5rem'
+                                                    }}
+                                                >
+                                                    <option value="ativo">✅ Ativo</option>
+                                                    <option value="inativo">❌ Inativo</option>
+                                                    <option value="suspenso">⚠️ Suspenso</option>
+                                                </select>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                                                 {(item as Aluno).data_matricula ? new Date((item as Aluno).data_matricula).toLocaleDateString() : 'N/A'}
                                             </td>
                                         </>
-                                    )}
-                                    {currentSection === 'cursos' && (
+                                    )}                                    {currentSection === 'cursos' && (
                                         <>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Curso).titulo}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Curso).nome_professor || 'N/A'}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Curso).nome_area || 'N/A'}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Curso).duracao_horas || 'N/A'}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                {(item as Curso).valor ? `R$ ${(item as Curso).valor.toFixed(2)}` : 'N/A'}
+                                            </td>
                                         </>
                                     )}
                                     {currentSection === 'palestras' && (
@@ -614,8 +710,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Area).nome_area}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Area).descricao}</td>
                                         </>
-                                    )}
-                                    {currentSection === 'professores' && (
+                                    )}                                    {currentSection === 'professores' && (
                                         <>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Professor).nome || 'N/A'}</td>
@@ -625,8 +720,12 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                                 {(item as Professor).data_contratacao ? new Date((item as Professor).data_contratacao).toLocaleDateString() : 'N/A'}
                                             </td>
                                         </>
-                                    )}
-                                    <td className="px-4 py-3 text-right">
+                                    )}                                    {currentSection === 'admins' && (
+                                        <>
+                                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
+                                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Admin).username}</td>
+                                        </>
+                                    )}                                    <td className="px-4 py-3 text-right">
                                         <div className="flex justify-end space-x-2">
                                             <button
                                                 onClick={() => handleView(item)}
@@ -635,17 +734,26 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                             >
                                                 <Eye className="h-4 w-4" />
                                             </button>
-                                            <button
-                                                onClick={() => handleEdit(item)}
-                                                className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
-                                                title="Editar"
-                                            >
-                                                <Edit className="h-4 w-4" />
-                                            </button>
+                                            {currentSection !== 'alunos' && (
+                                                <button
+                                                    onClick={() => handleEdit(item)}
+                                                    className="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
+                                                    title="Editar"
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </button>
+                                            )}
                                             <button
                                                 onClick={() => handleDelete(item.id)}
-                                                className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
-                                                title="Excluir"
+                                                className={`${currentSection === 'admins' && item.id === currentAdmin.id
+                                                    ? 'text-gray-400 cursor-not-allowed'
+                                                    : 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200'
+                                                    }`}
+                                                title={currentSection === 'admins' && item.id === currentAdmin.id
+                                                    ? 'Não é possível excluir sua própria conta'
+                                                    : 'Excluir'
+                                                }
+                                                disabled={currentSection === 'admins' && item.id === currentAdmin.id}
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
@@ -817,9 +925,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                         >
                             <Settings className="h-4 w-4" />
                             <span>Áreas</span>
-                        </button>
-
-                        <button
+                        </button>                        <button
                             onClick={() => handleSectionChange('cursos')}
                             className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${currentSection === 'cursos'
                                 ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
@@ -828,6 +934,17 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                         >
                             <BookOpen className="h-4 w-4" />
                             <span>Cursos</span>
+                        </button>
+
+                        <button
+                            onClick={() => handleSectionChange('admins')}
+                            className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-left transition-colors ${currentSection === 'admins'
+                                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600'
+                                }`}
+                        >
+                            <Settings className="h-4 w-4" />
+                            <span>Administradores</span>
                         </button>
                     </nav>
                 </div>

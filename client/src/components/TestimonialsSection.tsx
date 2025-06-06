@@ -76,8 +76,8 @@ export default function TestimonialsSection() {
             <Star
                 key={index}
                 className={`h-4 w-4 ${index < rating
-                        ? 'text-yellow-400 fill-current'
-                        : 'text-gray-300 dark:text-gray-600'
+                    ? 'text-yellow-400 fill-current'
+                    : 'text-gray-300 dark:text-gray-600'
                     }`}
             />
         ));
@@ -85,11 +85,10 @@ export default function TestimonialsSection() {
 
     return (
         <section className="py-20 bg-white dark:bg-slate-900">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">                {/* Header */}
                 <div className="text-center mb-16">
                     <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-                        O Que Nossos Alunos Dizem
+                        Avaliações dos Nossos Alunos
                     </h2>
                     <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
                         Milhares de estudantes já conquistaram seus sonhos com nossos cursos.

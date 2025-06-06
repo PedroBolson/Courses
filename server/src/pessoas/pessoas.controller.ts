@@ -6,8 +6,8 @@ export class PessoasController {
   constructor(private pessoasService: PessoasService) { }
 
   @Post()
-  create(@Body() body: { nome: string; email: string; telefone?: string }) {
-    return this.pessoasService.create(body.nome, body.email, body.telefone || '');
+  create(@Body() body: { nome: string; email: string; telefone?: string, cpf: string }) {
+    return this.pessoasService.create(body.nome, body.email, body.telefone || '', body.cpf);
   }
 
   @Get()
@@ -21,8 +21,8 @@ export class PessoasController {
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() body: { nome: string; email: string; telefone?: string }) {
-    return this.pessoasService.update(+id, body.nome, body.email, body.telefone || '');
+  update(@Param('id') id: string, @Body() body: { nome: string; email: string; telefone?: string, cpf: string }) {
+    return this.pessoasService.update(+id, body.nome, body.email, body.telefone || '', body.cpf);
   }
 
   @Delete(':id')

@@ -1,0 +1,28 @@
+{
+    "version": "0.0.1",
+    "configurations": [
+        {
+            "name": "▶️ Run Backend",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "npm run start:dev",
+            "cwd": "${workspaceFolder}/server"
+        },
+        {
+            "name": "▶️ Run Frontend",
+            "type": "node-terminal",
+            "request": "launch",
+            "command": "npm run dev",
+            "cwd": "${workspaceFolder}/client"
+        }
+    ],
+    "compounds": [
+        {
+            "name": "▶️ Dev Fullstack",
+            "configurations": [
+                "▶️ Run Backend",
+                "▶️ Run Frontend"
+            ]
+        }
+    ]
+}
