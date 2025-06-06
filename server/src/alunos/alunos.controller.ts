@@ -29,4 +29,14 @@ export class AlunosController {
   remove(@Param('id') id: string) {
     return this.alunosService.remove(+id);
   }
+
+  @Post('login')
+  login(@Body() body: { email: string; password: string }) {
+    return this.alunosService.login(body.email, body.password);
+  }
+
+  @Get(':id/cursos')
+  getCursos(@Param('id') id: string) {
+    return this.alunosService.getCursosDoAluno(+id);
+  }
 }

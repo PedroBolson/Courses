@@ -132,18 +132,17 @@ export default function EnrollmentFlow({
                     telefone: personData.telefone,
                     cpf: cpfLimpo
                 })
-            });            if (!pessoaResponse.ok) {
+            }); if (!pessoaResponse.ok) {
                 const errorData = await pessoaResponse.text();
                 if (pessoaResponse.status === 409 || errorData.includes('already exists') || errorData.includes('duplicate')) {
                     throw new Error('Já existe um usuário cadastrado com esses dados. Verifique se você já possui uma conta.');
                 }
                 throw new Error('Erro ao criar pessoa');
-            }
-
-            const pessoaData = await pessoaResponse.json();
+            } const pessoaData = await pessoaResponse.json();
             const fixedPessoaData = fixObjectEncoding(pessoaData);
             const pessoaId = fixedPessoaData.rows[0].id;
 
+            console.log('Pessoa criada com ID:', pessoaId);
             addQuery(fixedPessoaData.executedQuery, 'POST /pessoas');
 
             // 2. Criar aluno
@@ -158,13 +157,12 @@ export default function EnrollmentFlow({
 
             if (!alunoResponse.ok) {
                 throw new Error('Erro ao criar aluno');
-            }
-
-            const alunoData = await alunoResponse.json();
+            } const alunoData = await alunoResponse.json();
             const fixedAlunoData = fixObjectEncoding(alunoData);
             const alunoId = fixedAlunoData.rows[0].id;
 
-            addQuery(fixedAlunoData.executedQuery, 'POST /alunos');            // 3. Criar pagamento
+            console.log('Aluno criado com ID:', alunoId);
+            addQuery(fixedAlunoData.executedQuery, 'POST /alunos');// 3. Criar pagamento
             const pagamentoResponse = await fetch(`${API_URL}/pagamentos`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -183,8 +181,26 @@ export default function EnrollmentFlow({
             const fixedPagamentoData = fixObjectEncoding(pagamentoData);
             const pagamentoId = fixedPagamentoData.rows[0].id;
 
-            addQuery(fixedPagamentoData.executedQuery, 'POST /pagamentos');            // 4. Inscrever aluno no curso (se courseId foi fornecido)
+            addQuery(fixedPagamentoData.executedQuery, 'POST /pagamentos');
+
+            // 3.1. Ativar aluno após pagamento bem-sucedido
+            const ativarAlunoResponse = await fetch(`${API_URL}/alunos/${alunoId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: 'ativo'
+                })
+            });
+
+            if (!ativarAlunoResponse.ok) {
+                console.warn('Erro ao ativar aluno, mas continuando o processo...');
+            } else {
+                const ativarAlunoData = await ativarAlunoResponse.json();
+                console.log('Aluno ativado com sucesso:', ativarAlunoData);
+            }// 4. Inscrever aluno no curso (se courseId foi fornecido)
             if (courseId) {
+                console.log('Tentando inscrever aluno no curso:', { alunoId, courseId });
+
                 const inscricaoResponse = await fetch(`${API_URL}/alunos-cursos`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -194,11 +210,18 @@ export default function EnrollmentFlow({
                     })
                 });
 
-                if (inscricaoResponse.ok) {
-                    const inscricaoData = await inscricaoResponse.json();
-                    const fixedInscricaoData = fixObjectEncoding(inscricaoData);
-                    addQuery(fixedInscricaoData.executedQuery, 'POST /alunos-cursos');
+                if (!inscricaoResponse.ok) {
+                    const errorText = await inscricaoResponse.text();
+                    console.error('Erro ao inscrever aluno no curso:', errorText);
+                    throw new Error('Erro ao inscrever aluno no curso');
                 }
+
+                const inscricaoData = await inscricaoResponse.json();
+                const fixedInscricaoData = fixObjectEncoding(inscricaoData);
+                addQuery(fixedInscricaoData.executedQuery, 'POST /alunos-cursos');
+                console.log('Aluno inscrito no curso com sucesso:', fixedInscricaoData);
+            } else {
+                console.warn('courseId não fornecido, pulando inscrição no curso');
             }
 
             setCreatedIds({

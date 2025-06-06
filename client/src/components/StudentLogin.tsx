@@ -1,54 +1,189 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, User, Lock, GraduationCap, BookOpen, Calendar, Award } from 'lucide-react';
+import { X, User, Lock, GraduationCap, BookOpen, Calendar, Award, Clock, DollarSign } from 'lucide-react';
+import CourseSelector from './CourseSelector';
+import EnrollmentFlow from './EnrollmentFlow';
+import { fixObjectEncoding } from '../utils/textUtils';
+import { useQuery } from '../contexts/QueryContext';
 
 interface StudentLoginProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
+interface StudentData {
+    id: number;
+    pessoa_id: number;
+    nome: string;
+    email: string;
+    telefone: string;
+    status_pagamento: string;
+}
+
+interface StudentCourse {
+    id: number;
+    titulo: string;
+    descricao: string;
+    duracao_horas: number;
+    valor: number;
+    professor_nome: string;
+    nome_area: string;
+    data_inscricao: string;
+}
+
+interface StudentCourseFromView {
+    AlunoID: number;
+    NomeAluno: string;
+    CursoID: number;
+    TituloCurso: string;
+    DataInscricao: string;
+    StatusPagamento: string;
+}
+
+interface DetailedCourse {
+    id: number;
+    titulo: string;
+    descricao: string;
+    duracao_horas: number;
+    valor: number;
+    professor_id: number;
+    nome_professor: string;
+    area_id: number;
+    nome_area: string;
+}
+
 export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
     const [credentials, setCredentials] = useState({ email: '', password: '' });
     const [loading, setLoading] = useState(false);
     const [showPortal, setShowPortal] = useState(false);
+    const [loginError, setLoginError] = useState(''); const [studentData, setStudentData] = useState<StudentData | null>(null);
+    const [studentCourses, setStudentCourses] = useState<StudentCourse[]>([]);
+    const [courseSelectorOpen, setCourseSelectorOpen] = useState(false);
+    const [enrollmentFlow, setEnrollmentFlow] = useState<{
+        isOpen: boolean;
+        courseName: string;
+        coursePrice: number;
+        courseId: number
+    }>({
+        isOpen: false,
+        courseName: '',
+        coursePrice: 299.90,
+        courseId: 1    });
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const { addQuery } = useQuery();
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        setLoginError('');        try {
+            // Login do aluno
+            const loginQuery = `POST ${API_URL}/alunos/login`;
+            addQuery(loginQuery, '/alunos/login');
+            
+            const loginResponse = await fetch(`${API_URL}/alunos/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(credentials)
+            });const loginData = await loginResponse.json();
 
-        // Simulate login process
-        setTimeout(() => {
-            setLoading(false);
+            if (!loginData.success) {
+                setLoginError(loginData.message);
+                setLoading(false);
+                return;
+            }
+
+            // Aplicar correção de encoding nos dados do aluno
+            const loginDataFixed = fixObjectEncoding(loginData);
+            console.log('Dados do aluno com encoding corrigido:', loginDataFixed.aluno);            // Buscar cursos do aluno usando a view
+            const viewQuery = `GET ${API_URL}/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`;
+            addQuery(viewQuery, `/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
+            
+            const cursosResponse = await fetch(`${API_URL}/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
+            const cursosData = await cursosResponse.json();
+
+            console.log('Dados do aluno logado:', loginDataFixed.aluno);
+            console.log('Cursos encontrados via view:', cursosData);
+
+            // Aplicar correção de encoding nos dados da view
+            const cursosDataFixed = fixObjectEncoding(cursosData);
+            console.log('Cursos com encoding corrigido:', cursosDataFixed);
+
+            // Transformar os dados da view para o formato esperado e buscar detalhes dos cursos
+            const cursosFormatados: StudentCourse[] = [];
+
+            if (cursosDataFixed.rows && cursosDataFixed.rows.length > 0) {
+                for (const item of cursosDataFixed.rows) {
+                    const viewCourse = item as StudentCourseFromView;                    // Se o curso existe (não é null), buscar detalhes completos
+                    if (viewCourse.CursoID) {
+                        try {
+                            const cursoDetailQuery = `GET ${API_URL}/cursos/${viewCourse.CursoID}`;
+                            addQuery(cursoDetailQuery, `/cursos/${viewCourse.CursoID}`);
+                            
+                            const cursoDetailResponse = await fetch(`${API_URL}/cursos/${viewCourse.CursoID}`);
+                            const cursoDetailData = await cursoDetailResponse.json();
+
+                            if (cursoDetailData.rows && cursoDetailData.rows[0]) {
+                                const detailedCourse = cursoDetailData.rows[0] as DetailedCourse;
+                                
+                                // Aplicar correção de encoding nos detalhes do curso
+                                const detailedCourseFixed = fixObjectEncoding(detailedCourse);
+
+                                cursosFormatados.push({
+                                    id: detailedCourseFixed.id,
+                                    titulo: detailedCourseFixed.titulo,
+                                    descricao: detailedCourseFixed.descricao,
+                                    duracao_horas: detailedCourseFixed.duracao_horas,
+                                    valor: detailedCourseFixed.valor,
+                                    professor_nome: detailedCourseFixed.nome_professor,
+                                    nome_area: detailedCourseFixed.nome_area,
+                                    data_inscricao: viewCourse.DataInscricao
+                                });
+                            }
+                        } catch (error) {
+                            console.error(`Erro ao buscar detalhes do curso ${viewCourse.CursoID}:`, error);
+                            // Fallback para dados básicos da view (já com encoding corrigido)
+                            cursosFormatados.push({
+                                id: viewCourse.CursoID,
+                                titulo: viewCourse.TituloCurso,
+                                descricao: 'Informações detalhadas não disponíveis',
+                                duracao_horas: 0,
+                                valor: 0,
+                                professor_nome: 'Professor não identificado',
+                                nome_area: 'Área não identificada',
+                                data_inscricao: viewCourse.DataInscricao
+                            });
+                        }
+                    }
+                }
+            }            console.log('Cursos formatados com detalhes:', cursosFormatados);
+
+            setStudentData(loginDataFixed.aluno);
+            setStudentCourses(cursosFormatados);
             setShowPortal(true);
-        }, 1500);
+        } catch (error) {
+            console.error('Error during login:', error);
+            setLoginError('Erro de conexão. Tente novamente.');
+        } finally {
+            setLoading(false);
+        }
+    }; const handleCourseSelect = (curso: { id: number; titulo: string; valor?: number }) => {
+        setEnrollmentFlow({
+            isOpen: true,
+            courseName: curso.titulo,
+            coursePrice: curso.valor || 299.90,
+            courseId: curso.id
+        });
+        setCourseSelectorOpen(false);
     };
 
-    const mockStudentData = {
-        name: 'Ana Silva',
-        email: 'ana.silva@email.com',
-        enrolledCourses: [
-            { id: 1, title: 'Matemática Completa', progress: 75, nextClass: '2024-01-15' },
-            { id: 2, title: 'Português e Literatura', progress: 60, nextClass: '2024-01-16' },
-            { id: 3, title: 'Física Moderna', progress: 45, nextClass: '2024-01-17' }
-        ],
-        upcomingTests: [
-            { id: 1, subject: 'Matemática', date: '2024-01-20', type: 'Simulado' },
-            { id: 2, subject: 'Português', date: '2024-01-22', type: 'Prova' }
-        ],
-        achievements: [
-            { id: 1, title: 'Primeira Prova', description: 'Completou sua primeira avaliação', icon: '🏆' },
-            { id: 2, title: 'Estudante Dedicado', description: '30 dias consecutivos de estudo', icon: '📚' },
-            { id: 3, title: 'Matemático', description: 'Excelência em Matemática', icon: '🔢' }
-        ]
+    const handleCloseEnrollment = () => {
+        setEnrollmentFlow(prev => ({ ...prev, isOpen: false }));
     };
 
-    if (!isOpen) return null;
-
-    if (showPortal) {
+    if (!isOpen) return null;    if (showPortal) {
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white dark:bg-slate-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+                <div className="bg-white dark:bg-slate-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto my-8">
                     {/* Header */}
                     <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
                         <div className="flex items-center space-x-3">
@@ -56,9 +191,8 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                                     Portal do Aluno
-                                </h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    Bem-vinda, {mockStudentData.name}!
+                                </h2>                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    Bem-vindo(a), {studentData?.nome}!
                                 </p>
                             </div>
                         </div>
@@ -82,9 +216,8 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                                     <div>
                                         <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
                                             Cursos Inscritos
-                                        </p>
-                                        <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
-                                            {mockStudentData.enrolledCourses.length}
+                                        </p>                                        <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                                            {studentCourses.length}
                                         </p>
                                     </div>
                                     <BookOpen className="h-8 w-8 text-blue-600 dark:text-blue-400" />
@@ -96,9 +229,8 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                                     <div>
                                         <p className="text-sm font-medium text-green-600 dark:text-green-400">
                                             Progresso Médio
-                                        </p>
-                                        <p className="text-2xl font-bold text-green-900 dark:text-green-100">
-                                            {Math.round(mockStudentData.enrolledCourses.reduce((acc, course) => acc + course.progress, 0) / mockStudentData.enrolledCourses.length)}%
+                                        </p>                                        <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                                            {studentCourses.length > 0 ? '68%' : '0%'}
                                         </p>
                                     </div>
                                     <Award className="h-8 w-8 text-green-600 dark:text-green-400" />
@@ -107,12 +239,11 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
 
                             <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
                                 <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                                            Próximas Provas
-                                        </p>
+                                    <div>                                        <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                                        Próximas Atividades
+                                    </p>
                                         <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
-                                            {mockStudentData.upcomingTests.length}
+                                            {studentCourses.length}
                                         </p>
                                     </div>
                                     <Calendar className="h-8 w-8 text-orange-600 dark:text-orange-400" />
@@ -125,99 +256,142 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                                     Meus Cursos
-                                </h3>
-                                <div className="space-y-4">
-                                    {mockStudentData.enrolledCourses.map((course) => (
-                                        <div key={course.id} className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <h4 className="font-medium text-gray-900 dark:text-white">
-                                                    {course.title}
-                                                </h4>
-                                                <span className="text-sm text-gray-500 dark:text-gray-400">
-                                                    {course.progress}%
-                                                </span>
+                                </h3>                                <div className="space-y-4">
+                                    {studentCourses.length > 0 ? (
+                                        studentCourses.map((course) => (
+                                            <div key={course.id} className="bg-white dark:bg-slate-700 rounded-lg p-6 shadow-sm border border-gray-200 dark:border-slate-600 hover:shadow-md transition-shadow">
+                                                <div className="flex items-start justify-between mb-3">
+                                                    <div className="flex-1">
+                                                        <h4 className="font-semibold text-lg text-gray-900 dark:text-white mb-2">
+                                                            {course.titulo}
+                                                        </h4>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
+                                                            {course.descricao}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                                        <Clock className="h-4 w-4 mr-2 text-blue-500" />
+                                                        <span>{course.duracao_horas}h de duração</span>
+                                                    </div>
+                                                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                                        <DollarSign className="h-4 w-4 mr-2 text-green-500" />
+                                                        <span>R$ {course.valor.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2 mb-4">
+                                                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                                        <User className="h-4 w-4 mr-2 text-purple-500" />
+                                                        <span>Professor: {course.professor_nome}</span>
+                                                    </div>
+                                                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                                        <BookOpen className="h-4 w-4 mr-2 text-orange-500" />
+                                                        <span>Área: {course.nome_area}</span>
+                                                    </div>
+                                                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
+                                                        <Calendar className="h-4 w-4 mr-2 text-teal-500" />
+                                                        <span>Inscrito em: {new Date(course.data_inscricao).toLocaleDateString('pt-BR')}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex gap-2">
+                                                    <button className="flex-1 bg-blue-600 text-white py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                                                        Acessar Curso
+                                                    </button>
+                                                    <button className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors">
+                                                        Detalhes
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mb-2">
-                                                <div
-                                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                                    style={{ width: `${course.progress}%` }}
-                                                ></div>
-                                            </div>
-                                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                                                Próxima aula: {new Date(course.nextClass).toLocaleDateString('pt-BR')}
-                                            </p>
-                                            <button className="mt-2 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
-                                                Continuar Estudando
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <p className="text-gray-500 dark:text-gray-400 mb-4">
+                                                Você ainda não está inscrito em nenhum curso.
+                                            </p>                                            <button
+                                                onClick={() => setCourseSelectorOpen(true)}
+                                                className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                                            >
+                                                Explorar Cursos
                                             </button>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
-                            </div>
-
-                            {/* Right Column */}
+                            </div>                            {/* Right Column */}
                             <div className="space-y-6">
-                                {/* Upcoming Tests */}
+                                {/* Informações do Aluno */}
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                        Próximas Avaliações
+                                        Suas Informações
                                     </h3>
-                                    <div className="space-y-3">
-                                        {mockStudentData.upcomingTests.map((test) => (
-                                            <div key={test.id} className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <h4 className="font-medium text-gray-900 dark:text-white">
-                                                            {test.subject}
-                                                        </h4>
-                                                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                                                            {test.type}
-                                                        </p>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-sm font-medium text-orange-600 dark:text-orange-400">
-                                                            {new Date(test.date).toLocaleDateString('pt-BR')}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
+                                    <div className="bg-gray-50 dark:bg-slate-700 rounded-lg p-4 space-y-2">
+                                        <div>
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Nome:</span>
+                                            <p className="text-gray-900 dark:text-white font-medium">{studentData?.nome}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Email:</span>
+                                            <p className="text-gray-900 dark:text-white font-medium">{studentData?.email}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Telefone:</span>
+                                            <p className="text-gray-900 dark:text-white font-medium">{studentData?.telefone || 'Não informado'}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Status:</span>
+                                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${studentData?.status_pagamento === 'ativo'
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                                                : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                                                }`}>
+                                                {studentData?.status_pagamento}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Achievements */}
+                                {/* Comprar Mais Cursos */}
                                 <div>
                                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                        Conquistas
+                                        Explore Mais Cursos
                                     </h3>
-                                    <div className="space-y-3">
-                                        {mockStudentData.achievements.map((achievement) => (
-                                            <div key={achievement.id} className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
-                                                <div className="flex items-start space-x-3">
-                                                    <span className="text-2xl">{achievement.icon}</span>
-                                                    <div>
-                                                        <h4 className="font-medium text-gray-900 dark:text-white">
-                                                            {achievement.title}
-                                                        </h4>
-                                                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                                                            {achievement.description}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
+                                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                                        <p className="text-blue-700 dark:text-blue-300 mb-3">
+                                            Amplie seus conhecimentos! Explore nossa variedade de cursos disponíveis.
+                                        </p>                                        <button
+                                            onClick={() => setCourseSelectorOpen(true)}
+                                            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            Ver Todos os Cursos
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
+                            </div>                        </div>
                     </div>
+
+                    {/* Course Selector Modal */}
+                    <CourseSelector
+                        isOpen={courseSelectorOpen}
+                        onClose={() => setCourseSelectorOpen(false)}
+                        onSelectCourse={handleCourseSelect}
+                    />
+
+                    {/* Enrollment Flow Modal */}
+                    <EnrollmentFlow
+                        isOpen={enrollmentFlow.isOpen}
+                        onClose={handleCloseEnrollment}
+                        courseName={enrollmentFlow.courseName}
+                        coursePrice={enrollmentFlow.coursePrice}
+                        courseId={enrollmentFlow.courseId}
+                    />
                 </div>
             </div>
         );
-    }
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-slate-800 rounded-xl p-8 max-w-md w-full mx-4">
+    }    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+            <div className="bg-white dark:bg-slate-800 rounded-xl p-8 max-w-md w-full mx-4 my-8">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center space-x-3">
@@ -231,8 +405,32 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                         className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
                     >
                         <X className="h-6 w-6" />
-                    </button>
-                </div>
+                    </button>                    </div>
+
+                {/* Error Message */}
+                {loginError && (
+                    <div className="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="text-red-800 dark:text-red-200 font-medium">
+                                    Erro no Login
+                                </h4>
+                                <p className="text-red-700 dark:text-red-300 text-sm">
+                                    {loginError}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setLoginError('');
+                                    setCredentials({ email: '', password: '' });
+                                }}
+                                className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 transition-colors"
+                            >
+                                Tentar Novamente
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 {/* Login Form */}
                 <form onSubmit={handleLogin} className="space-y-4">
@@ -302,15 +500,23 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                             <span>Entrar</span>
                         )}
                     </button>
-                </form>
+                </form>            </div>
 
-                {/* Demo credentials hint */}
-                <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <p className="text-xs text-blue-600 dark:text-blue-400 text-center">
-                        💡 Demo: Use qualquer email e senha para acessar o portal
-                    </p>
-                </div>
-            </div>
+            {/* Course Selector Modal */}
+            <CourseSelector
+                isOpen={courseSelectorOpen}
+                onClose={() => setCourseSelectorOpen(false)}
+                onSelectCourse={handleCourseSelect}
+            />
+
+            {/* Enrollment Flow Modal */}
+            <EnrollmentFlow
+                isOpen={enrollmentFlow.isOpen}
+                onClose={handleCloseEnrollment}
+                courseName={enrollmentFlow.courseName}
+                coursePrice={enrollmentFlow.coursePrice}
+                courseId={enrollmentFlow.courseId}
+            />
         </div>
     );
 }

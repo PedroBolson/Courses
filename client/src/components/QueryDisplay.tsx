@@ -52,7 +52,7 @@ export default function QueryDisplay({ queries, title = "SQL Queries Executadas"
                 <Database className="h-5 w-5" />
             </button>            {/* Query Panel */}
             {isVisible && (
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-w-md w-96 max-h-96 overflow-hidden">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-w-md w-96 max-h-100 overflow-hidden">
                     {/* Header */}
                     <div className="bg-gray-50 dark:bg-gray-900 px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
                         <div className="flex items-center space-x-2">

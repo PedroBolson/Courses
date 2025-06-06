@@ -57,4 +57,75 @@ export class AlunosService {
     const query = `DELETE FROM security.Alunos WHERE id = @param0`;
     return this.db.executeQuery(query, [id]);
   }
+
+  // Login de aluno (busca por email e valida senha)
+  async login(email: string, password: string) {
+    const querySelect = `
+      SELECT a.id, a.pessoa_id, a.senha_hash, a.status_pagamento,
+             p.nome, p.email, p.telefone
+      FROM security.Alunos a
+      INNER JOIN catalogo.Pessoas p ON a.pessoa_id = p.id
+      WHERE p.email = @param0`;
+
+    const result = await this.db.executeQuery(querySelect, [email]);
+
+    if (result.rows.length === 0) {
+      return {
+        success: false,
+        message: 'Email não encontrado',
+        executedQuery: querySelect
+      };
+    }
+
+    const aluno = result.rows[0];
+
+    // Verificar se a conta está ativa
+    if (aluno.status_pagamento !== 'ativo') {
+      return {
+        success: false,
+        message: `Conta ${aluno.status_pagamento}. Entre em contato com o suporte.`,
+        status: aluno.status_pagamento,
+        executedQuery: querySelect
+      };
+    }
+
+    // Verificar senha
+    const match = await bcrypt.compare(password, aluno.senha_hash);
+    if (!match) {
+      return {
+        success: false,
+        message: 'Senha incorreta',
+        executedQuery: querySelect
+      };
+    }
+
+    // Login bem-sucedido
+    return {
+      success: true,
+      aluno: {
+        id: aluno.id,
+        pessoa_id: aluno.pessoa_id,
+        nome: aluno.nome,
+        email: aluno.email,
+        telefone: aluno.telefone,
+        status_pagamento: aluno.status_pagamento
+      },
+      executedQuery: querySelect
+    };
+  }
+  // Buscar cursos de um aluno
+  async getCursosDoAluno(alunoId: number) {
+    const query = `
+      SELECT c.id, c.titulo, c.descricao, c.duracao_horas, c.valor,
+             p.nome as professor_nome, a.nome_area,
+             ac.data_inscricao
+      FROM relacionamento.AlunosCursos ac
+      INNER JOIN catalogo.Cursos c ON ac.curso_id = c.id
+      INNER JOIN catalogo.Pessoas p ON c.professor_id = p.id
+      INNER JOIN catalogo.Areas a ON c.area_id = a.id
+      WHERE ac.aluno_id = @param0
+      ORDER BY ac.data_inscricao DESC`;
+
+    return this.db.executeQuery(query, [alunoId]);
+  }
 }
