@@ -112,13 +112,12 @@ export class AlunosService {
       },
       executedQuery: querySelect
     };
-  }
-  // Buscar cursos de um aluno
+  }  // Buscar cursos de um aluno
   async getCursosDoAluno(alunoId: number) {
     const query = `
       SELECT c.id, c.titulo, c.descricao, c.duracao_horas, c.valor,
              p.nome as professor_nome, a.nome_area,
-             ac.data_inscricao
+             ac.data_inscricao, ac.id as alunosCursosId
       FROM relacionamento.AlunosCursos ac
       INNER JOIN catalogo.Cursos c ON ac.curso_id = c.id
       INNER JOIN catalogo.Pessoas p ON c.professor_id = p.id

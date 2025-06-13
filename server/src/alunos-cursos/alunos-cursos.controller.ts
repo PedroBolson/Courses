@@ -9,10 +9,14 @@ export class AlunosCursosController {
   create(@Body() body: { aluno_id: number; curso_id: number }) {
     return this.alunosCursosService.create(body.aluno_id, body.curso_id);
   }
-
   @Get()
   findAll() {
     return this.alunosCursosService.findAll();
+  }
+
+  @Get('aluno/:alunoId/curso/:cursoId')
+  findByAlunoAndCurso(@Param('alunoId') alunoId: string, @Param('cursoId') cursoId: string) {
+    return this.alunosCursosService.findByAlunoAndCurso(+alunoId, +cursoId);
   }
 
   @Get(':id')
@@ -28,5 +32,11 @@ export class AlunosCursosController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.alunosCursosService.remove(+id);
+  }
+
+  // Buscar apenas o ID da relação usando aluno_id e curso_id que vêm da view
+  @Get('relation/:alunoId/:cursoId')
+  async getRelationId(@Param('alunoId') alunoId: string, @Param('cursoId') cursoId: string) {
+    return this.alunosCursosService.getRelationId(+alunoId, +cursoId);
   }
 }

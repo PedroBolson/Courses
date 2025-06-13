@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, User, Lock, GraduationCap, BookOpen, Calendar, Award, Clock, DollarSign } from 'lucide-react';
+import { X, User, Lock, GraduationCap, BookOpen, Calendar, Award, Clock, DollarSign, Star } from 'lucide-react';
 import CourseSelector from './CourseSelector';
 import EnrollmentFlow from './EnrollmentFlow';
+import FeedbackModal from './FeedbackModal';
 import { fixObjectEncoding } from '../utils/textUtils';
 import { useQuery } from '../contexts/QueryContext';
 
@@ -23,6 +24,7 @@ interface StudentData {
 
 interface StudentCourse {
     id: number;
+    alunosCursosId?: number; // ID da relação aluno-curso para feedback
     titulo: string;
     descricao: string;
     duracao_horas: number;
@@ -47,9 +49,7 @@ interface DetailedCourse {
     descricao: string;
     duracao_horas: number;
     valor: number;
-    professor_id: number;
     nome_professor: string;
-    area_id: number;
     nome_area: string;
 }
 
@@ -58,33 +58,42 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
     const [loading, setLoading] = useState(false);
     const [showPortal, setShowPortal] = useState(false);
     const [loginError, setLoginError] = useState(''); const [studentData, setStudentData] = useState<StudentData | null>(null);
-    const [studentCourses, setStudentCourses] = useState<StudentCourse[]>([]);
-    const [courseSelectorOpen, setCourseSelectorOpen] = useState(false);
+    const [studentCourses, setStudentCourses] = useState<StudentCourse[]>([]); const [courseSelectorOpen, setCourseSelectorOpen] = useState(false);
     const [enrollmentFlow, setEnrollmentFlow] = useState<{
         isOpen: boolean;
         courseName: string;
         coursePrice: number;
-        courseId: number
+        courseId: number;
     }>({
         isOpen: false,
         courseName: '',
         coursePrice: 299.90,
-        courseId: 1    });
+        courseId: 1
+    });
+    const [feedbackModal, setFeedbackModal] = useState<{
+        isOpen: boolean;
+        alunosCursosId: number;
+        courseTitle: string;
+    }>({
+        isOpen: false,
+        alunosCursosId: 0,
+        courseTitle: ''
+    });
 
     const { addQuery } = useQuery();
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';const handleLogin = async (e: React.FormEvent) => {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        setLoginError('');        try {
+        setLoginError(''); try {
             // Login do aluno
             const loginQuery = `POST ${API_URL}/alunos/login`;
             addQuery(loginQuery, '/alunos/login');
-            
+
             const loginResponse = await fetch(`${API_URL}/alunos/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(credentials)
-            });const loginData = await loginResponse.json();
+            }); const loginData = await loginResponse.json();
 
             if (!loginData.success) {
                 setLoginError(loginData.message);
@@ -97,7 +106,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
             console.log('Dados do aluno com encoding corrigido:', loginDataFixed.aluno);            // Buscar cursos do aluno usando a view
             const viewQuery = `GET ${API_URL}/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`;
             addQuery(viewQuery, `/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
-            
+
             const cursosResponse = await fetch(`${API_URL}/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
             const cursosData = await cursosResponse.json();
 
@@ -109,27 +118,38 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
             console.log('Cursos com encoding corrigido:', cursosDataFixed);
 
             // Transformar os dados da view para o formato esperado e buscar detalhes dos cursos
-            const cursosFormatados: StudentCourse[] = [];
-
-            if (cursosDataFixed.rows && cursosDataFixed.rows.length > 0) {
+            const cursosFormatados: StudentCourse[] = []; if (cursosDataFixed.rows && cursosDataFixed.rows.length > 0) {
                 for (const item of cursosDataFixed.rows) {
-                    const viewCourse = item as StudentCourseFromView;                    // Se o curso existe (não é null), buscar detalhes completos
+                    const viewCourse = item as StudentCourseFromView;
+
+                    // Se o curso existe (não é null), buscar detalhes completos
                     if (viewCourse.CursoID) {
                         try {
                             const cursoDetailQuery = `GET ${API_URL}/cursos/${viewCourse.CursoID}`;
                             addQuery(cursoDetailQuery, `/cursos/${viewCourse.CursoID}`);
-                            
+
                             const cursoDetailResponse = await fetch(`${API_URL}/cursos/${viewCourse.CursoID}`);
                             const cursoDetailData = await cursoDetailResponse.json();
 
                             if (cursoDetailData.rows && cursoDetailData.rows[0]) {
                                 const detailedCourse = cursoDetailData.rows[0] as DetailedCourse;
-                                
+
                                 // Aplicar correção de encoding nos detalhes do curso
-                                const detailedCourseFixed = fixObjectEncoding(detailedCourse);
+                                const detailedCourseFixed = fixObjectEncoding(detailedCourse);                                // Buscar o alunosCursosId da relação usando rota simples
+                                const relationQuery = `GET ${API_URL}/alunos-cursos/relation/${loginDataFixed.aluno.id}/${viewCourse.CursoID}`;
+                                addQuery(relationQuery, `/alunos-cursos/relation/${loginDataFixed.aluno.id}/${viewCourse.CursoID}`);
+
+                                const relationResponse = await fetch(`${API_URL}/alunos-cursos/relation/${loginDataFixed.aluno.id}/${viewCourse.CursoID}`);
+                                const relationData = await relationResponse.json();
+
+                                let alunosCursosId: number | undefined = undefined;
+                                if (relationData.rows && relationData.rows[0]) {
+                                    alunosCursosId = relationData.rows[0].id;
+                                }
 
                                 cursosFormatados.push({
                                     id: detailedCourseFixed.id,
+                                    alunosCursosId: alunosCursosId, // ID da relação para feedback
                                     titulo: detailedCourseFixed.titulo,
                                     descricao: detailedCourseFixed.descricao,
                                     duracao_horas: detailedCourseFixed.duracao_horas,
@@ -141,21 +161,10 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                             }
                         } catch (error) {
                             console.error(`Erro ao buscar detalhes do curso ${viewCourse.CursoID}:`, error);
-                            // Fallback para dados básicos da view (já com encoding corrigido)
-                            cursosFormatados.push({
-                                id: viewCourse.CursoID,
-                                titulo: viewCourse.TituloCurso,
-                                descricao: 'Informações detalhadas não disponíveis',
-                                duracao_horas: 0,
-                                valor: 0,
-                                professor_nome: 'Professor não identificado',
-                                nome_area: 'Área não identificada',
-                                data_inscricao: viewCourse.DataInscricao
-                            });
                         }
                     }
                 }
-            }            console.log('Cursos formatados com detalhes:', cursosFormatados);
+            } console.log('Cursos formatados com detalhes:', cursosFormatados);
 
             setStudentData(loginDataFixed.aluno);
             setStudentCourses(cursosFormatados);
@@ -167,6 +176,17 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
             setLoading(false);
         }
     }; const handleCourseSelect = (curso: { id: number; titulo: string; valor?: number }) => {
+        if (!studentData) return;
+
+        // Verificar se o aluno já está inscrito neste curso
+        const isEnrolled = studentCourses.some(c => c.id === curso.id);
+        if (isEnrolled) {
+            alert('Você já está inscrito neste curso!');
+            setCourseSelectorOpen(false);
+            return;
+        }
+
+        // Abrir o fluxo de pagamento
         setEnrollmentFlow({
             isOpen: true,
             courseName: curso.titulo,
@@ -178,9 +198,85 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
 
     const handleCloseEnrollment = () => {
         setEnrollmentFlow(prev => ({ ...prev, isOpen: false }));
+        // Recarregar cursos após fechamento (caso tenha havido uma compra)
+        if (studentData) {
+            reloadStudentCourses();
+        }
     };
 
-    if (!isOpen) return null;    if (showPortal) {
+    const reloadStudentCourses = async () => {
+        if (!studentData) return;
+
+        try {
+            // Recarregar os cursos do aluno
+            const viewQuery = `GET ${API_URL}/vw/alunos-cursos-pagamentos/${studentData.id}`;
+            addQuery(viewQuery, `/vw/alunos-cursos-pagamentos/${studentData.id}`);
+
+            const cursosResponse = await fetch(`${API_URL}/vw/alunos-cursos-pagamentos/${studentData.id}`);
+            const cursosData = await cursosResponse.json();
+            const cursosDataFixed = fixObjectEncoding(cursosData);
+
+            // Reprocessar cursos (mesmo código do login)
+            const cursosFormatados: StudentCourse[] = [];
+            if (cursosDataFixed.rows && cursosDataFixed.rows.length > 0) {
+                for (const item of cursosDataFixed.rows) {
+                    const viewCourse = item as StudentCourseFromView;
+                    if (viewCourse.CursoID) {
+                        try {
+                            const cursoDetailResponse = await fetch(`${API_URL}/cursos/${viewCourse.CursoID}`);
+                            const cursoDetailData = await cursoDetailResponse.json();
+
+                            if (cursoDetailData.rows && cursoDetailData.rows[0]) {
+                                const detailedCourse = cursoDetailData.rows[0] as DetailedCourse;
+                                const detailedCourseFixed = fixObjectEncoding(detailedCourse); const relationResponse = await fetch(`${API_URL}/alunos-cursos/relation/${studentData.id}/${viewCourse.CursoID}`);
+                                const relationData = await relationResponse.json();
+
+                                let alunosCursosId: number | undefined = undefined;
+                                if (relationData.rows && relationData.rows[0]) {
+                                    alunosCursosId = relationData.rows[0].id;
+                                }
+
+                                cursosFormatados.push({
+                                    id: detailedCourseFixed.id,
+                                    alunosCursosId: alunosCursosId,
+                                    titulo: detailedCourseFixed.titulo,
+                                    descricao: detailedCourseFixed.descricao,
+                                    duracao_horas: detailedCourseFixed.duracao_horas,
+                                    valor: detailedCourseFixed.valor,
+                                    professor_nome: detailedCourseFixed.nome_professor,
+                                    nome_area: detailedCourseFixed.nome_area,
+                                    data_inscricao: viewCourse.DataInscricao
+                                });
+                            }
+                        } catch (error) {
+                            console.error(`Erro ao buscar detalhes do curso ${viewCourse.CursoID}:`, error);
+                        }
+                    }
+                }
+            }
+
+            setStudentCourses(cursosFormatados);
+        } catch (error) {
+            console.error('Erro ao recarregar cursos:', error);
+        }
+    };// Handlers para o feedback
+    const handleOpenFeedback = (alunosCursosId: number, courseTitle: string) => {
+        setFeedbackModal({
+            isOpen: true,
+            alunosCursosId,
+            courseTitle
+        });
+    };
+
+    const handleCloseFeedback = () => {
+        setFeedbackModal({
+            isOpen: false,
+            alunosCursosId: 0,
+            courseTitle: ''
+        });
+    };
+
+    if (!isOpen) return null; if (showPortal) {
         return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
                 <div className="bg-white dark:bg-slate-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto my-8">
@@ -295,15 +391,20 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                                                         <Calendar className="h-4 w-4 mr-2 text-teal-500" />
                                                         <span>Inscrito em: {new Date(course.data_inscricao).toLocaleDateString('pt-BR')}</span>
                                                     </div>
-                                                </div>
-
-                                                <div className="flex gap-2">
-                                                    <button className="flex-1 bg-blue-600 text-white py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                                                </div>                                                <div className="space-y-2">
+                                                    <button className="w-full bg-blue-600 text-white py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium">
                                                         Acessar Curso
                                                     </button>
-                                                    <button className="px-4 py-2.5 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-600 transition-colors">
-                                                        Detalhes
-                                                    </button>
+                                                    {course.alunosCursosId && (
+                                                        <button
+                                                            onClick={() => handleOpenFeedback(course.alunosCursosId!, course.titulo)}
+                                                            className="w-full bg-yellow-500 text-white py-2.5 px-4 rounded-lg hover:bg-yellow-600 transition-colors flex items-center justify-center space-x-2"
+                                                            title="Avaliar Curso"
+                                                        >
+                                                            <Star className="h-4 w-4" />
+                                                            <span>Avaliar Curso</span>
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))
@@ -369,9 +470,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                                     </div>
                                 </div>
                             </div>                        </div>
-                    </div>
-
-                    {/* Course Selector Modal */}
+                    </div>                    {/* Course Selector Modal */}
                     <CourseSelector
                         isOpen={courseSelectorOpen}
                         onClose={() => setCourseSelectorOpen(false)}
@@ -386,10 +485,18 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                         coursePrice={enrollmentFlow.coursePrice}
                         courseId={enrollmentFlow.courseId}
                     />
+
+                    {/* Feedback Modal */}
+                    <FeedbackModal
+                        isOpen={feedbackModal.isOpen}
+                        onClose={handleCloseFeedback}
+                        alunosCursosId={feedbackModal.alunosCursosId}
+                        courseTitle={feedbackModal.courseTitle}
+                    />
                 </div>
             </div>
         );
-    }    return (
+    } return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl p-8 max-w-md w-full mx-4 my-8">
                 {/* Header */}
@@ -500,9 +607,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                             <span>Entrar</span>
                         )}
                     </button>
-                </form>            </div>
-
-            {/* Course Selector Modal */}
+                </form>            </div>            {/* Course Selector Modal */}
             <CourseSelector
                 isOpen={courseSelectorOpen}
                 onClose={() => setCourseSelectorOpen(false)}
@@ -516,6 +621,14 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                 courseName={enrollmentFlow.courseName}
                 coursePrice={enrollmentFlow.coursePrice}
                 courseId={enrollmentFlow.courseId}
+            />
+
+            {/* Feedback Modal */}
+            <FeedbackModal
+                isOpen={feedbackModal.isOpen}
+                onClose={handleCloseFeedback}
+                alunosCursosId={feedbackModal.alunosCursosId}
+                courseTitle={feedbackModal.courseTitle}
             />
         </div>
     );

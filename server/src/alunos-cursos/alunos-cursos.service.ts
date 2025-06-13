@@ -29,7 +29,6 @@ export class AlunosCursosService {
       INNER JOIN catalogo.Cursos cu ON ac.curso_id = cu.id`;
     return this.db.executeQuery(query);
   }
-
   // Busca uma inscrição específica
   async findOne(id: number) {
     const query = `
@@ -48,6 +47,24 @@ export class AlunosCursosService {
     return this.db.executeQuery(query, [id]);
   }
 
+  // Busca inscrição específica por aluno e curso
+  async findByAlunoAndCurso(aluno_id: number, curso_id: number) {
+    const query = `
+      SELECT ac.id,
+             al.id AS aluno_id,
+             p.nome AS nome_aluno,
+             cu.id AS curso_id,
+             cu.titulo AS titulo_curso,
+             ac.data_inscricao,
+             ac.status
+      FROM relacionamento.AlunosCursos ac
+      INNER JOIN security.Alunos al ON ac.aluno_id = al.id
+      INNER JOIN catalogo.Pessoas p ON al.pessoa_id = p.id
+      INNER JOIN catalogo.Cursos cu ON ac.curso_id = cu.id
+      WHERE ac.aluno_id = @param0 AND ac.curso_id = @param1`;
+    return this.db.executeQuery(query, [aluno_id, curso_id]);
+  }
+
   // Atualiza apenas status da inscrição
   async updateStatus(id: number, status: string) {
     const query = `
@@ -61,5 +78,14 @@ export class AlunosCursosService {
   async remove(id: number) {
     const query = `DELETE FROM relacionamento.AlunosCursos WHERE id = @param0`;
     return this.db.executeQuery(query, [id]);
+  }
+
+  // Busca apenas o ID da relação por aluno e curso (para feedback)
+  async getRelationId(aluno_id: number, curso_id: number) {
+    const query = `
+      SELECT ac.id
+      FROM relacionamento.AlunosCursos ac
+      WHERE ac.aluno_id = @param0 AND ac.curso_id = @param1`;
+    return this.db.executeQuery(query, [aluno_id, curso_id]);
   }
 }

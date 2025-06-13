@@ -14,6 +14,7 @@ import { PalestrasModule } from './palestras/palestras.module';
 import { PagamentosModule } from './pagamentos/pagamentos.module';
 import { VwController } from './vw/vw.controller';
 import { VwModule } from './vw/vw.module';
+import { FeedbackModule } from './feedback/feedback.module';
 
 @Module({
   imports: [
@@ -30,7 +31,8 @@ import { VwModule } from './vw/vw.module';
     AlunosCursosModule,
     PalestrasModule,
     PagamentosModule,
-    VwModule
+    VwModule,
+    FeedbackModule
   ],
   controllers: [AppController, VwController],
   providers: [AppService],
