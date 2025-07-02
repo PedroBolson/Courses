@@ -24,7 +24,7 @@ export class FeedbackService {
              f.data_feedback,
              p.nome as nome_aluno,
              p.email as email_aluno,
-             c.nome as nome_curso
+             c.titulo as nome_curso
       FROM relacionamento.FeedbackCursos f
       INNER JOIN relacionamento.AlunosCursos ac ON f.alunosCursosId = ac.id
       INNER JOIN security.Alunos a ON ac.aluno_id = a.id
