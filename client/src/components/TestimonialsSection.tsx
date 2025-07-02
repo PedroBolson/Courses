@@ -72,41 +72,29 @@ export default function TestimonialsSection() {
     const { addQuery } = useQuery();
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-    // Buscar feedbacks reais do banco
+    // Buscar feedbacks do banco
     useEffect(() => {
         const fetchFeedbacks = async () => {
             try {
                 setLoading(true);
 
-                console.log('Iniciando busca de feedbacks...');
-
-                // Buscar todos os feedbacks com JOIN completo
                 const response = await fetch(`${API_URL}/feedback`);
 
-                console.log('Status da resposta:', response.status);
-                console.log('Response OK:', response.ok);
-
                 if (!response.ok) {
-                    console.log('Erro na resposta:', response.statusText);
                     setFeedbacks([]);
                     setLoading(false);
                     return;
                 }
 
                 const data = await response.json();
-                console.log('Dados brutos da API:', data);
-
                 const fixedData = fixObjectEncoding(data);
-                console.log('Dados após encoding fix:', fixedData);
 
                 if (data.executedQuery) {
                     addQuery(data.executedQuery, 'GET /feedback');
                 }
 
                 if (fixedData.rows && fixedData.rows.length > 0) {
-                    console.log(`Encontrados ${fixedData.rows.length} feedbacks para processar`);
-
-                    // Mapear os dados diretamente - o servidor já retorna tudo via JOIN
+                    // Mapear os dados via JOIN
                     const feedbacksProcessed = fixedData.rows.map((feedback: {
                         id: number;
                         nome_aluno: string;
@@ -115,49 +103,35 @@ export default function TestimonialsSection() {
                         comentario: string;
                         data_feedback: string;
                     }) => {
-                        console.log('Processando feedback raw:', feedback);
-
-                        // Garantir que não há valores nulos/undefined para evitar erros de renderização
                         return {
                             id: feedback.id || 0,
                             aluno_nome: feedback.nome_aluno || 'Aluno',
                             curso_titulo: feedback.nome_curso || 'Curso',
-                            avaliacao: Number(feedback.avaliacao) || 5, // Valor padrão 5 estrelas se não vier avaliação
+                            avaliacao: Number(feedback.avaliacao) || 5,
                             comentario: feedback.comentario || 'Ótimo curso!',
                             data_feedback: feedback.data_feedback || new Date().toISOString(),
                             area_nome: 'Curso'
                         };
                     });
 
-                    console.log('Feedbacks processados:', feedbacksProcessed);
-
                     // Filtrar feedbacks válidos e ordenar por data
                     const validFeedbacks = feedbacksProcessed
                         .filter((f: FeedbackData) => {
-                            // Verificar dados obrigatórios
-                            const isValid = f.id && f.aluno_nome && f.curso_titulo && f.comentario;
-                            if (!isValid) {
-                                console.warn('Feedback inválido ignorado:', f);
-                            }
-                            return isValid;
+                            return f.id && f.aluno_nome && f.curso_titulo && f.comentario;
                         })
                         .sort((a: FeedbackData, b: FeedbackData) => {
                             try {
                                 return new Date(b.data_feedback).getTime() - new Date(a.data_feedback).getTime();
-                            } catch (e) {
-                                console.warn('Erro ao ordenar por data:', e);
+                            } catch {
                                 return 0;
                             }
                         });
 
-                    console.log('Feedbacks válidos:', validFeedbacks);
                     setFeedbacks(validFeedbacks);
                 } else {
-                    console.log('Nenhum feedback encontrado nos dados retornados');
                     setFeedbacks([]);
                 }
-            } catch (error) {
-                console.error('Erro ao buscar feedbacks:', error);
+            } catch {
                 setFeedbacks([]);
             } finally {
                 setLoading(false);
@@ -259,7 +233,6 @@ export default function TestimonialsSection() {
     return (
         <section id="avaliacoes" className="py-20 bg-white dark:bg-slate-900">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                {/* Header */}
                 <div className="text-center mb-16">
                     <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 dark:text-white mb-4">
                         Avaliações dos Nossos Alunos
@@ -268,8 +241,6 @@ export default function TestimonialsSection() {
                         Veja o que nossos alunos estão dizendo sobre os cursos.
                         Feedbacks reais de quem está estudando conosco!
                     </p>
-
-                    {/* Stats reais baseados nos feedbacks */}
                     <div className="flex justify-center items-center space-x-8 mt-8">
                         <div className="text-center">
                             <div className="text-3xl font-bold text-green-600 dark:text-green-400">
@@ -292,9 +263,7 @@ export default function TestimonialsSection() {
                     </div>
                 </div>
 
-                {/* Carrossel */}
                 <div className="relative">
-                    {/* Botões de navegação - só mostrar se houver mais de 1 grupo */}
                     {groupedFeedbacks.length > 1 && (
                         <>
                             <button
@@ -313,11 +282,8 @@ export default function TestimonialsSection() {
                             </button>
                         </>
                     )}
-
-                    {/* Container do carrossel */}
                     <div className="overflow-hidden">
                         {groupedFeedbacks.length > 1 ? (
-                            /* Carrossel ativo com múltiplos grupos */
                             <div
                                 className="flex transition-transform duration-500 ease-in-out"
                                 style={{ transform: `translateX(-${currentIndex * 100}%)` }}
@@ -334,7 +300,6 @@ export default function TestimonialsSection() {
                                 ))}
                             </div>
                         ) : (
-                            /* Layout estático para poucos feedbacks */
                             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                                 {feedbacks.map((feedback) => (
                                     <TestimonialCard key={feedback.id} feedback={feedback} renderStars={renderStars} />
@@ -343,7 +308,6 @@ export default function TestimonialsSection() {
                         )}
                     </div>
 
-                    {/* Indicadores - só mostrar se houver mais de 1 grupo */}
                     {groupedFeedbacks.length > 1 && (
                         <div className="flex justify-center space-x-2 mt-8">
                             {groupedFeedbacks.map((_, index) => (
@@ -362,7 +326,6 @@ export default function TestimonialsSection() {
                     )}
                 </div>
 
-                {/* CTA Section */}
                 <div className="text-center mt-16">
                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white">
                         <h3 className="text-2xl font-bold mb-4">

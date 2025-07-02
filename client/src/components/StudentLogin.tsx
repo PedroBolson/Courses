@@ -116,7 +116,6 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
 
             // Aplicar correção de encoding nos dados do aluno
             const loginDataFixed = fixObjectEncoding(loginData);
-            console.log('Dados do aluno com encoding corrigido:', loginDataFixed.aluno);
 
             // Add the login query to context if available
             if (loginData.executedQuery) {
@@ -127,9 +126,6 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
             const cursosResponse = await fetch(`${API_URL}/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
             const cursosData = await cursosResponse.json();
 
-            console.log('Dados do aluno logado:', loginDataFixed.aluno);
-            console.log('Cursos encontrados via view:', cursosData);
-
             // Add view query to context if available
             if (cursosData.executedQuery) {
                 addQuery(cursosData.executedQuery, `GET /vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
@@ -137,7 +133,6 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
 
             // Aplicar correção de encoding nos dados da view
             const cursosDataFixed = fixObjectEncoding(cursosData);
-            console.log('Cursos com encoding corrigido:', cursosDataFixed);
 
             // Transformar os dados da view para o formato esperado e buscar detalhes dos cursos
             const cursosFormatados: StudentCourse[] = []; if (cursosDataFixed.rows && cursosDataFixed.rows.length > 0) {
@@ -182,7 +177,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                         }
                     }
                 }
-            } console.log('Cursos formatados com detalhes:', cursosFormatados);
+            }
 
             setStudentData(loginDataFixed.aluno);
             setStudentCourses(cursosFormatados);
@@ -194,7 +189,6 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
             setLoading(false);
         }
     }; const handleCourseSelect = (curso: { id: number; titulo: string; valor?: number }) => {
-        console.log('handleCourseSelect: studentData =', studentData);
         if (!studentData) return;
 
         // Verificar se o aluno já está inscrito neste curso
@@ -206,7 +200,6 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
         }
 
         // Abrir o fluxo de pagamento
-        console.log('Abrindo EnrollmentFlow com studentData:', studentData);
         setEnrollmentFlow({
             isOpen: true,
             courseName: curso.titulo,

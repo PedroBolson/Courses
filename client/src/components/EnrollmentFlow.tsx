@@ -128,20 +128,11 @@ export default function EnrollmentFlow({
             let alunoId: number;
 
             if (studentData) {
-                // Se o estudante já está logado, usar seus dados
+                // Usar dados do estudante logado
                 pessoaId = studentData.pessoa_id;
                 alunoId = studentData.id;
-                console.log('Usando dados do estudante logado:', { pessoaId, alunoId });
             } else {
-                // Debug: verificar dados antes de enviar
                 const cpfLimpo = personData.cpf.replace(/\D/g, '');
-                console.log('Dados da pessoa:', {
-                    nome: personData.nome,
-                    email: personData.email,
-                    telefone: personData.telefone,
-                    cpf: cpfLimpo,
-                    cpfLength: cpfLimpo.length
-                });
 
                 // 1. Criar pessoa
                 const pessoaResponse = await fetch(`${API_URL}/pessoas`, {
@@ -167,7 +158,6 @@ export default function EnrollmentFlow({
                 const fixedPessoaData = fixObjectEncoding(pessoaData);
                 pessoaId = fixedPessoaData.rows[0].id;
 
-                console.log('Pessoa criada com ID:', pessoaId);
                 if (fixedPessoaData.executedQuery) addQuery(fixedPessoaData.executedQuery, 'POST /pessoas');
 
                 // 2. Criar aluno
@@ -188,7 +178,6 @@ export default function EnrollmentFlow({
                 const fixedAlunoData = fixObjectEncoding(alunoData);
                 alunoId = fixedAlunoData.rows[0].id;
 
-                console.log('Aluno criado com ID:', alunoId);
                 if (fixedAlunoData.executedQuery) addQuery(fixedAlunoData.executedQuery, 'POST /alunos');
             }
 
@@ -222,15 +211,11 @@ export default function EnrollmentFlow({
                 })
             });
 
-            if (!ativarAlunoResponse.ok) {
-                console.warn('Erro ao ativar aluno, mas continuando o processo...');
-            } else {
-                const ativarAlunoData = await ativarAlunoResponse.json();
-                console.log('Aluno ativado com sucesso:', ativarAlunoData);
-            }// 4. Inscrever aluno no curso (se courseId foi fornecido)
+            // Continuar mesmo se a ativação falhar
+            if (ativarAlunoResponse.ok) {
+                await ativarAlunoResponse.json();
+            }            // Inscrever aluno no curso
             if (courseId) {
-                console.log('Tentando inscrever aluno no curso:', { alunoId, courseId });
-
                 const inscricaoResponse = await fetch(`${API_URL}/alunos-cursos`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -241,17 +226,12 @@ export default function EnrollmentFlow({
                 });
 
                 if (!inscricaoResponse.ok) {
-                    const errorText = await inscricaoResponse.text();
-                    console.error('Erro ao inscrever aluno no curso:', errorText);
                     throw new Error('Erro ao inscrever aluno no curso');
                 }
 
                 const inscricaoData = await inscricaoResponse.json();
                 const fixedInscricaoData = fixObjectEncoding(inscricaoData);
                 if (fixedInscricaoData.executedQuery) addQuery(fixedInscricaoData.executedQuery, 'POST /alunos-cursos');
-                console.log('Aluno inscrito no curso com sucesso:', fixedInscricaoData);
-            } else {
-                console.warn('courseId não fornecido, pulando inscrição no curso');
             }
 
             setCreatedIds({
@@ -261,8 +241,8 @@ export default function EnrollmentFlow({
             });
 
             setCurrentStep('success');
-        } catch (error) {
-            console.error('Erro no processo de matrícula:', error); alert('Erro ao processar matrícula. Tente novamente.');
+        } catch {
+            alert('Erro ao processar matrícula. Tente novamente.');
             setCurrentStep('payment');
         }
     };
@@ -323,7 +303,7 @@ export default function EnrollmentFlow({
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">                {/* Header */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
                 <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 text-white">
                     <div className="flex items-center justify-between">
                         <div>
@@ -351,7 +331,6 @@ export default function EnrollmentFlow({
                     </div>
                 </div>
 
-                {/* Progress Steps */}
                 <div className="px-6 py-4 bg-gray-50 dark:bg-slate-700">
                     <div className="flex items-center justify-between">
                         {steps.map((step, index) => {
@@ -382,7 +361,6 @@ export default function EnrollmentFlow({
                     </div>
                 </div>
 
-                {/* Content */}
                 <div className="p-6">
                     {currentStep === 'personal' && (
                         <div className="space-y-4">
@@ -446,8 +424,6 @@ export default function EnrollmentFlow({
                             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                                 Escolha a forma de pagamento
                             </h3>
-
-                            {/* Payment Method Selection */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                                 <button
                                     onClick={() => setPaymentMethod('cartao_credito')}
@@ -486,7 +462,6 @@ export default function EnrollmentFlow({
                                 </button>
                             </div>
 
-                            {/* Payment Method Specific Content */}
                             {paymentMethod === 'cartao_credito' && (
                                 <>
                                     <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 text-white mb-6">
@@ -680,7 +655,6 @@ export default function EnrollmentFlow({
                     )}
                 </div>
 
-                {/* Footer */}
                 <div className="bg-gray-50 dark:bg-slate-700 px-6 py-4 flex justify-between items-center">
                     <div className="flex items-center space-x-2">
                         {currentStep !== 'processing' && currentStep !== 'success' && (
