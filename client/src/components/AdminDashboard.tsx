@@ -686,7 +686,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                                 </select>
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                                                {(item as Aluno).data_matricula ? new Date((item as Aluno).data_matricula).toLocaleDateString() : 'N/A'}
+                                                {(item as Aluno).data_matricula ? new Date((item as Aluno).data_matricula).toLocaleDateString('pt-BR') : 'N/A'}
                                             </td>
                                         </>
                                     )}                                    {currentSection === 'cursos' && (
@@ -706,7 +706,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Palestra).titulo}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                                                {(item as Palestra).data_hora ? new Date((item as Palestra).data_hora).toLocaleString() : 'N/A'}
+                                                {(item as Palestra).data_hora ? new Date((item as Palestra).data_hora).toLocaleString('pt-BR') : 'N/A'}
                                             </td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Palestra).local}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Palestra).nome_convidado || 'N/A'}</td>
@@ -732,7 +732,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Professor).email || 'N/A'}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Professor).especialidade}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
-                                                {(item as Professor).data_contratacao ? new Date((item as Professor).data_contratacao).toLocaleDateString() : 'N/A'}
+                                                {(item as Professor).data_contratacao ? new Date((item as Professor).data_contratacao).toLocaleDateString('pt-BR') : 'N/A'}
                                             </td>
                                         </>
                                     )}                                    {currentSection === 'admins' && (

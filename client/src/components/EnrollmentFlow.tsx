@@ -303,7 +303,7 @@ export default function EnrollmentFlow({
 
     return (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[99vh] overflow-hidden">
                 <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 text-white">
                     <div className="flex items-center justify-between">
                         <div>
@@ -629,26 +629,40 @@ export default function EnrollmentFlow({
                                 Matrícula realizada com sucesso! 🎉
                             </h3>
                             <p className="text-gray-600 dark:text-gray-400 mb-6">
-                                Bem-vindo(a) ao {courseName}! Sua conta foi criada e o pagamento foi aprovado.
+                                {studentData 
+                                    ? `Parabéns! Sua inscrição no curso ${courseName} foi confirmada.`
+                                    : `Bem-vindo(a) ao ${courseName}! Sua conta foi criada e o pagamento foi aprovado.`
+                                }
                             </p>
 
                             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
                                 <h4 className="font-semibold text-green-800 dark:text-green-400 mb-2">
                                     Dados da sua matrícula:
                                 </h4>
-                                <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
-                                    <p><strong>Nome:</strong> {personData.nome}</p>
-                                    <p><strong>Email:</strong> {personData.email}</p>
-                                    <p><strong>ID do Aluno:</strong> #{createdIds.alunoId}</p>
-                                    <p><strong>ID do Pagamento:</strong> #{createdIds.pagamentoId}</p>
-                                    <p><strong>Senha temporária:</strong> tempPassword123</p>
-                                </div>
+                                {studentData ? (
+                                    <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+                                        <p><strong>Nome:</strong> {personData.nome}</p>
+                                        <p><strong>Email:</strong> {personData.email}</p>
+                                        <p><strong>ID do Pagamento:</strong> #{createdIds.pagamentoId}</p>
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-green-700 dark:text-green-300 space-y-1">
+                                        <p><strong>Nome:</strong> {personData.nome}</p>
+                                        <p><strong>Email:</strong> {personData.email}</p>
+                                        <p><strong>ID do Aluno:</strong> #{createdIds.alunoId}</p>
+                                        <p><strong>ID do Pagamento:</strong> #{createdIds.pagamentoId}</p>
+                                        <p><strong>Senha temporária:</strong> tempPassword123</p>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                                    💡 <strong>Próximos passos:</strong> Você receberá um email com instruções para
-                                    acessar a plataforma e alterar sua senha.
+                                    {studentData ? (
+                                        <>💡 <strong>Próximos passos:</strong> Você já pode acessar o conteúdo do curso através do Portal do Aluno.</>
+                                    ) : (
+                                        <>💡 <strong>Próximos passos:</strong> Você receberá um email com instruções para acessar a plataforma e alterar sua senha.</>
+                                    )}
                                 </p>
                             </div>
                         </div>
