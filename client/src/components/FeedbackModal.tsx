@@ -42,12 +42,10 @@ export default function FeedbackModal({
     const fetchExistingFeedback = useCallback(async () => {
         try {
             setLoading(true);
-            const query = `GET ${API_URL}/feedback/aluno-curso/${alunosCursosId}`;
-            addQuery(query, `/feedback/aluno-curso/${alunosCursosId}`);
-
             const response = await fetch(`${API_URL}/feedback/aluno-curso/${alunosCursosId}`);
             const data = await response.json();
             const fixedData = fixObjectEncoding(data);
+            if (data.executedQuery) addQuery(data.executedQuery, `GET /feedback/aluno-curso/${alunosCursosId}`);
 
             if (fixedData.rows && fixedData.rows.length > 0) {
                 const existingData = fixedData.rows[0];
@@ -102,9 +100,6 @@ export default function FeedbackModal({
 
             if (mode === 'create') {
                 // Criar novo feedback
-                const query = `POST ${API_URL}/feedback`;
-                addQuery(query, '/feedback');
-
                 const response = await fetch(`${API_URL}/feedback`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -118,16 +113,13 @@ export default function FeedbackModal({
                 if (response.ok) {
                     const data = await response.json();
                     const fixedData = fixObjectEncoding(data);
-                    addQuery(fixedData.executedQuery || query, 'POST /feedback');
+                    if (fixedData.executedQuery) addQuery(fixedData.executedQuery, 'POST /feedback');
 
                     alert('Feedback enviado com sucesso!');
                     await fetchExistingFeedback(); // Recarregar dados
                 }
             } else if (mode === 'edit' && existingFeedback?.id) {
                 // Atualizar feedback existente
-                const query = `PUT ${API_URL}/feedback/${existingFeedback.id}`;
-                addQuery(query, `/feedback/${existingFeedback.id}`);
-
                 const response = await fetch(`${API_URL}/feedback/${existingFeedback.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
@@ -140,7 +132,7 @@ export default function FeedbackModal({
                 if (response.ok) {
                     const data = await response.json();
                     const fixedData = fixObjectEncoding(data);
-                    addQuery(fixedData.executedQuery || query, `PUT /feedback/${existingFeedback.id}`);
+                    if (fixedData.executedQuery) addQuery(fixedData.executedQuery, `PUT /feedback/${existingFeedback.id}`);
 
                     alert('Feedback atualizado com sucesso!');
                     await fetchExistingFeedback(); // Recarregar dados
@@ -163,14 +155,13 @@ export default function FeedbackModal({
 
         try {
             setSaveLoading(true);
-            const query = `DELETE ${API_URL}/feedback/${existingFeedback.id}`;
-            addQuery(query, `/feedback/${existingFeedback.id}`);
-
             const response = await fetch(`${API_URL}/feedback/${existingFeedback.id}`, {
                 method: 'DELETE'
             });
 
             if (response.ok) {
+                const data = await response.json();
+                if (data.executedQuery) addQuery(data.executedQuery, `DELETE /feedback/${existingFeedback.id}`);
                 alert('Feedback excluído com sucesso!');
                 setExistingFeedback(null);
                 setFeedback({
@@ -201,7 +192,7 @@ export default function FeedbackModal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-purple-600 to-blue-600 px-6 py-4 text-white">

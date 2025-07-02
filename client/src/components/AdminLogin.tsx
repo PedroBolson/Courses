@@ -35,7 +35,7 @@ export default function AdminLogin({ isOpen, onClose, onSuccess }: AdminLoginPro
             const data = await response.json();
 
             if (data.executedQuery) {
-                addQuery(data.executedQuery);
+                addQuery(data.executedQuery, 'POST /admin/login');
             } if (data.success) {
                 // Success - redirect to admin dashboard
                 if (onSuccess) {
@@ -58,7 +58,7 @@ export default function AdminLogin({ isOpen, onClose, onSuccess }: AdminLoginPro
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">

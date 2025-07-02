@@ -81,14 +81,27 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
     });
 
     const { addQuery } = useQuery();
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; const handleLogin = async (e: React.FormEvent) => {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+    // Bloquear scroll do body quando modal estiver aberto
+    React.useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'unset';
+        }
+
+        // Cleanup quando o componente desmontar
+        return () => {
+            document.body.style.overflow = 'unset';
+        };
+    }, [isOpen]);
+
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setLoginError(''); try {
             // Login do aluno
-            const loginQuery = `POST ${API_URL}/alunos/login`;
-            addQuery(loginQuery, '/alunos/login');
-
             const loginResponse = await fetch(`${API_URL}/alunos/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -103,15 +116,24 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
 
             // Aplicar correção de encoding nos dados do aluno
             const loginDataFixed = fixObjectEncoding(loginData);
-            console.log('Dados do aluno com encoding corrigido:', loginDataFixed.aluno);            // Buscar cursos do aluno usando a view
-            const viewQuery = `GET ${API_URL}/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`;
-            addQuery(viewQuery, `/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
+            console.log('Dados do aluno com encoding corrigido:', loginDataFixed.aluno);
 
+            // Add the login query to context if available
+            if (loginData.executedQuery) {
+                addQuery(loginData.executedQuery, 'POST /alunos/login');
+            }
+
+            // Buscar cursos do aluno usando a view
             const cursosResponse = await fetch(`${API_URL}/vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
             const cursosData = await cursosResponse.json();
 
             console.log('Dados do aluno logado:', loginDataFixed.aluno);
             console.log('Cursos encontrados via view:', cursosData);
+
+            // Add view query to context if available
+            if (cursosData.executedQuery) {
+                addQuery(cursosData.executedQuery, `GET /vw/alunos-cursos-pagamentos/${loginDataFixed.aluno.id}`);
+            }
 
             // Aplicar correção de encoding nos dados da view
             const cursosDataFixed = fixObjectEncoding(cursosData);
@@ -125,22 +147,18 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                     // Se o curso existe (não é null), buscar detalhes completos
                     if (viewCourse.CursoID) {
                         try {
-                            const cursoDetailQuery = `GET ${API_URL}/cursos/${viewCourse.CursoID}`;
-                            addQuery(cursoDetailQuery, `/cursos/${viewCourse.CursoID}`);
-
                             const cursoDetailResponse = await fetch(`${API_URL}/cursos/${viewCourse.CursoID}`);
                             const cursoDetailData = await cursoDetailResponse.json();
+                            if (cursoDetailData.executedQuery) addQuery(cursoDetailData.executedQuery, `GET /cursos/${viewCourse.CursoID}`);
 
                             if (cursoDetailData.rows && cursoDetailData.rows[0]) {
                                 const detailedCourse = cursoDetailData.rows[0] as DetailedCourse;
 
                                 // Aplicar correção de encoding nos detalhes do curso
                                 const detailedCourseFixed = fixObjectEncoding(detailedCourse);                                // Buscar o alunosCursosId da relação usando rota simples
-                                const relationQuery = `GET ${API_URL}/alunos-cursos/relation/${loginDataFixed.aluno.id}/${viewCourse.CursoID}`;
-                                addQuery(relationQuery, `/alunos-cursos/relation/${loginDataFixed.aluno.id}/${viewCourse.CursoID}`);
-
                                 const relationResponse = await fetch(`${API_URL}/alunos-cursos/relation/${loginDataFixed.aluno.id}/${viewCourse.CursoID}`);
                                 const relationData = await relationResponse.json();
+                                if (relationData.executedQuery) addQuery(relationData.executedQuery, `GET /alunos-cursos/relation/${loginDataFixed.aluno.id}/${viewCourse.CursoID}`);
 
                                 let alunosCursosId: number | undefined = undefined;
                                 if (relationData.rows && relationData.rows[0]) {
@@ -176,6 +194,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
             setLoading(false);
         }
     }; const handleCourseSelect = (curso: { id: number; titulo: string; valor?: number }) => {
+        console.log('handleCourseSelect: studentData =', studentData);
         if (!studentData) return;
 
         // Verificar se o aluno já está inscrito neste curso
@@ -187,6 +206,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
         }
 
         // Abrir o fluxo de pagamento
+        console.log('Abrindo EnrollmentFlow com studentData:', studentData);
         setEnrollmentFlow({
             isOpen: true,
             courseName: curso.titulo,
@@ -209,12 +229,10 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
 
         try {
             // Recarregar os cursos do aluno
-            const viewQuery = `GET ${API_URL}/vw/alunos-cursos-pagamentos/${studentData.id}`;
-            addQuery(viewQuery, `/vw/alunos-cursos-pagamentos/${studentData.id}`);
-
             const cursosResponse = await fetch(`${API_URL}/vw/alunos-cursos-pagamentos/${studentData.id}`);
             const cursosData = await cursosResponse.json();
             const cursosDataFixed = fixObjectEncoding(cursosData);
+            if (cursosData.executedQuery) addQuery(cursosData.executedQuery, `GET /vw/alunos-cursos-pagamentos/${studentData.id}`);
 
             // Reprocessar cursos (mesmo código do login)
             const cursosFormatados: StudentCourse[] = [];
@@ -276,18 +294,21 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
         });
     };
 
-    if (!isOpen) return null; if (showPortal) {
+    if (!isOpen) return null;
+
+    if (showPortal) {
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-                <div className="bg-white dark:bg-slate-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto my-8">
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
+                <div className="bg-white dark:bg-slate-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
                     {/* Header */}
-                    <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div className="sticky top-0 bg-white dark:bg-slate-800 flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700 z-10">
                         <div className="flex items-center space-x-3">
                             <GraduationCap className="h-8 w-8 text-blue-600" />
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                                     Portal do Aluno
-                                </h2>                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                </h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
                                     Bem-vindo(a), {studentData?.nome}!
                                 </p>
                             </div>
@@ -475,6 +496,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                         isOpen={courseSelectorOpen}
                         onClose={() => setCourseSelectorOpen(false)}
                         onSelectCourse={handleCourseSelect}
+                        enrolledCourseIds={studentCourses.map(course => course.id)}
                     />
 
                     {/* Enrollment Flow Modal */}
@@ -484,6 +506,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                         courseName={enrollmentFlow.courseName}
                         coursePrice={enrollmentFlow.coursePrice}
                         courseId={enrollmentFlow.courseId}
+                        studentData={studentData || undefined}
                     />
 
                     {/* Feedback Modal */}
@@ -497,7 +520,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
             </div>
         );
     } return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl p-8 max-w-md w-full mx-4 my-8">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -612,6 +635,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                 isOpen={courseSelectorOpen}
                 onClose={() => setCourseSelectorOpen(false)}
                 onSelectCourse={handleCourseSelect}
+                enrolledCourseIds={studentCourses.map(course => course.id)}
             />
 
             {/* Enrollment Flow Modal */}
@@ -621,6 +645,7 @@ export default function StudentLogin({ isOpen, onClose }: StudentLoginProps) {
                 courseName={enrollmentFlow.courseName}
                 coursePrice={enrollmentFlow.coursePrice}
                 courseId={enrollmentFlow.courseId}
+                studentData={studentData || undefined}
             />
 
             {/* Feedback Modal */}

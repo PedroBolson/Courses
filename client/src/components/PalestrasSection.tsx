@@ -41,19 +41,19 @@ export default function PalestrasSection() {
                 const palestrasResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/palestras`);
                 const palestrasData = await palestrasResponse.json();
                 setPalestras(fixObjectEncoding(palestrasData.rows || []));
-                addQuery(palestrasData.executedQuery || 'SELECT * FROM catalogo.Palestras', '/palestras');
+                addQuery(palestrasData.executedQuery || 'SELECT * FROM catalogo.Palestras', 'GET /palestras');
 
                 // Fetch pessoas
                 const pessoasResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/pessoas`);
                 const pessoasData = await pessoasResponse.json();
                 setPessoas(fixObjectEncoding(pessoasData.rows || []));
-                addQuery(pessoasData.executedQuery || 'SELECT * FROM catalogo.Pessoas', '/pessoas');
+                addQuery(pessoasData.executedQuery || 'SELECT * FROM catalogo.Pessoas', 'GET /pessoas');
 
                 // Fetch areas
                 const areasResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/areas`);
                 const areasData = await areasResponse.json();
                 setAreas(fixObjectEncoding(areasData.rows || []));
-                addQuery(areasData.executedQuery || 'SELECT * FROM catalogo.Areas', '/areas');
+                addQuery(areasData.executedQuery || 'SELECT * FROM catalogo.Areas', 'GET /areas');
 
             } catch (error) {
                 console.error('Error fetching palestras:', error);

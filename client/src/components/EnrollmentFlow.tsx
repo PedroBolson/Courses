@@ -11,6 +11,13 @@ interface EnrollmentFlowProps {
     courseName?: string;
     coursePrice?: number;
     courseId?: number;
+    studentData?: {
+        id: number;
+        pessoa_id: number;
+        nome: string;
+        email: string;
+        telefone: string;
+    };
 }
 
 interface PersonData {
@@ -35,7 +42,8 @@ export default function EnrollmentFlow({
     onClose,
     courseName = "Curso ENEM",
     coursePrice = 299.90,
-    courseId = 1
+    courseId = 1,
+    studentData
 }: EnrollmentFlowProps) {
     const [currentStep, setCurrentStep] = useState<Step>('personal');
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cartao_credito');
@@ -60,7 +68,11 @@ export default function EnrollmentFlow({
     const { addQuery } = useQuery();
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-    const steps = [
+    const steps = studentData ? [
+        { id: 'payment', title: 'Pagamento', icon: CreditCard },
+        { id: 'processing', title: 'Processando', icon: Lock },
+        { id: 'success', title: 'Concluído', icon: CheckCircle }
+    ] : [
         { id: 'personal', title: 'Dados Pessoais', icon: User },
         { id: 'payment', title: 'Pagamento', icon: CreditCard },
         { id: 'processing', title: 'Processando', icon: Lock },
@@ -112,57 +124,75 @@ export default function EnrollmentFlow({
             // Simular delay de processamento
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            // Debug: verificar dados antes de enviar
-            const cpfLimpo = personData.cpf.replace(/\D/g, '');
-            console.log('Dados da pessoa:', {
-                nome: personData.nome,
-                email: personData.email,
-                telefone: personData.telefone,
-                cpf: cpfLimpo,
-                cpfLength: cpfLimpo.length
-            });
+            let pessoaId: number;
+            let alunoId: number;
 
-            // 1. Criar pessoa
-            const pessoaResponse = await fetch(`${API_URL}/pessoas`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            if (studentData) {
+                // Se o estudante já está logado, usar seus dados
+                pessoaId = studentData.pessoa_id;
+                alunoId = studentData.id;
+                console.log('Usando dados do estudante logado:', { pessoaId, alunoId });
+            } else {
+                // Debug: verificar dados antes de enviar
+                const cpfLimpo = personData.cpf.replace(/\D/g, '');
+                console.log('Dados da pessoa:', {
                     nome: personData.nome,
                     email: personData.email,
                     telefone: personData.telefone,
-                    cpf: cpfLimpo
-                })
-            }); if (!pessoaResponse.ok) {
-                const errorData = await pessoaResponse.text();
-                if (pessoaResponse.status === 409 || errorData.includes('already exists') || errorData.includes('duplicate')) {
-                    throw new Error('Já existe um usuário cadastrado com esses dados. Verifique se você já possui uma conta.');
+                    cpf: cpfLimpo,
+                    cpfLength: cpfLimpo.length
+                });
+
+                // 1. Criar pessoa
+                const pessoaResponse = await fetch(`${API_URL}/pessoas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nome: personData.nome,
+                        email: personData.email,
+                        telefone: personData.telefone,
+                        cpf: cpfLimpo
+                    })
+                });
+
+                if (!pessoaResponse.ok) {
+                    const errorData = await pessoaResponse.text();
+                    if (pessoaResponse.status === 409 || errorData.includes('already exists') || errorData.includes('duplicate')) {
+                        throw new Error('Já existe um usuário cadastrado com esses dados. Verifique se você já possui uma conta.');
+                    }
+                    throw new Error('Erro ao criar pessoa');
                 }
-                throw new Error('Erro ao criar pessoa');
-            } const pessoaData = await pessoaResponse.json();
-            const fixedPessoaData = fixObjectEncoding(pessoaData);
-            const pessoaId = fixedPessoaData.rows[0].id;
 
-            console.log('Pessoa criada com ID:', pessoaId);
-            addQuery(fixedPessoaData.executedQuery, 'POST /pessoas');
+                const pessoaData = await pessoaResponse.json();
+                const fixedPessoaData = fixObjectEncoding(pessoaData);
+                pessoaId = fixedPessoaData.rows[0].id;
 
-            // 2. Criar aluno
-            const alunoResponse = await fetch(`${API_URL}/alunos`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    pessoa_id: pessoaId,
-                    senha: 'tempPassword123' // Senha temporária que o aluno pode alterar depois
-                })
-            });
+                console.log('Pessoa criada com ID:', pessoaId);
+                if (fixedPessoaData.executedQuery) addQuery(fixedPessoaData.executedQuery, 'POST /pessoas');
 
-            if (!alunoResponse.ok) {
-                throw new Error('Erro ao criar aluno');
-            } const alunoData = await alunoResponse.json();
-            const fixedAlunoData = fixObjectEncoding(alunoData);
-            const alunoId = fixedAlunoData.rows[0].id;
+                // 2. Criar aluno
+                const alunoResponse = await fetch(`${API_URL}/alunos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        pessoa_id: pessoaId,
+                        senha: 'tempPassword123' // Senha temporária que o aluno pode alterar depois
+                    })
+                });
 
-            console.log('Aluno criado com ID:', alunoId);
-            addQuery(fixedAlunoData.executedQuery, 'POST /alunos');// 3. Criar pagamento
+                if (!alunoResponse.ok) {
+                    throw new Error('Erro ao criar aluno');
+                }
+
+                const alunoData = await alunoResponse.json();
+                const fixedAlunoData = fixObjectEncoding(alunoData);
+                alunoId = fixedAlunoData.rows[0].id;
+
+                console.log('Aluno criado com ID:', alunoId);
+                if (fixedAlunoData.executedQuery) addQuery(fixedAlunoData.executedQuery, 'POST /alunos');
+            }
+
+            // 3. Criar pagamento
             const pagamentoResponse = await fetch(`${API_URL}/pagamentos`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -181,7 +211,7 @@ export default function EnrollmentFlow({
             const fixedPagamentoData = fixObjectEncoding(pagamentoData);
             const pagamentoId = fixedPagamentoData.rows[0].id;
 
-            addQuery(fixedPagamentoData.executedQuery, 'POST /pagamentos');
+            if (fixedPagamentoData.executedQuery) addQuery(fixedPagamentoData.executedQuery, 'POST /pagamentos');
 
             // 3.1. Ativar aluno após pagamento bem-sucedido
             const ativarAlunoResponse = await fetch(`${API_URL}/alunos/${alunoId}/status`, {
@@ -218,7 +248,7 @@ export default function EnrollmentFlow({
 
                 const inscricaoData = await inscricaoResponse.json();
                 const fixedInscricaoData = fixObjectEncoding(inscricaoData);
-                addQuery(fixedInscricaoData.executedQuery, 'POST /alunos-cursos');
+                if (fixedInscricaoData.executedQuery) addQuery(fixedInscricaoData.executedQuery, 'POST /alunos-cursos');
                 console.log('Aluno inscrito no curso com sucesso:', fixedInscricaoData);
             } else {
                 console.warn('courseId não fornecido, pulando inscrição no curso');
@@ -246,28 +276,64 @@ export default function EnrollmentFlow({
     };
 
     const handleBack = () => {
-        if (currentStep === 'payment') {
+        if (currentStep === 'payment' && !studentData) {
             setCurrentStep('personal');
         }
     }; const handleClose = () => {
-        setCurrentStep('personal');
+        // Resetar para o step inicial apropriado
+        setCurrentStep(studentData ? 'payment' : 'personal');
         setPaymentMethod('cartao_credito');
-        setPersonData({ nome: '', email: '', telefone: '', cpf: '' });
         setPaymentData({ cardNumber: '', cardName: '', expiryDate: '', cvv: '' });
         setCreatedIds({});
+
+        // Só resetar dados pessoais se não há dados do estudante
+        if (!studentData) {
+            setPersonData({ nome: '', email: '', telefone: '', cpf: '' });
+        }
+
         onClose();
     };
+
+    // Inicializar dados pessoais se estudante estiver logado
+    React.useEffect(() => {
+        if (isOpen) {
+            if (studentData) {
+                setPersonData({
+                    nome: studentData.nome,
+                    email: studentData.email,
+                    telefone: studentData.telefone,
+                    cpf: '' // CPF não está disponível nos dados do estudante
+                });
+                // Se temos dados do estudante, começar no pagamento
+                setCurrentStep('payment');
+            } else {
+                // Resetar para início se não há dados
+                setCurrentStep('personal');
+                setPersonData({
+                    nome: '',
+                    email: '',
+                    telefone: '',
+                    cpf: ''
+                });
+            }
+        }
+    }, [studentData, isOpen]);
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">                {/* Header */}
                 <div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4 text-white">
                     <div className="flex items-center justify-between">
                         <div>
                             <h2 className="text-xl font-bold">Matrícula no {courseName}</h2>
-                            <p className="text-blue-100">Complete sua inscrição em 3 passos simples</p>
+                            <p className="text-blue-100">
+                                {studentData
+                                    ? 'Confirme sua matrícula e efetue o pagamento'
+                                    : 'Complete sua inscrição em 3 passos simples'
+                                }
+                            </p>
                         </div>
                         <div className="flex items-center gap-4">
                             <div className="text-right">

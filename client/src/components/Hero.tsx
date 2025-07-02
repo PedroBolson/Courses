@@ -62,8 +62,8 @@ export default function Hero() {
 
                 // Fetch cursos count
                 const cursosResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/cursos`);
-                const cursosData = fixObjectEncoding(await cursosResponse.json()); if (alunosData.executedQuery) addQuery(alunosData.executedQuery);
-                if (cursosData.executedQuery) addQuery(cursosData.executedQuery);
+                const cursosData = fixObjectEncoding(await cursosResponse.json()); if (alunosData.executedQuery) addQuery(alunosData.executedQuery, 'GET /alunos');
+                if (cursosData.executedQuery) addQuery(cursosData.executedQuery, 'GET /cursos');
 
                 setStats({
                     alunos: alunosData.rows?.length || 0,

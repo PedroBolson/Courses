@@ -136,7 +136,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                 pagamentosRes.json()
             ].map(promise => promise.then(data => fixObjectEncoding(data))));
 
-            // Add queries to context
+            // Add queries to context - showing SQL query with endpoint for identification
             if (alunosData.executedQuery) addQuery(alunosData.executedQuery, 'GET /alunos');
             if (cursosData.executedQuery) addQuery(cursosData.executedQuery, 'GET /cursos');
             if (palestrasData.executedQuery) addQuery(palestrasData.executedQuery, 'GET /palestras');
@@ -153,19 +153,21 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
         } finally {
             setLoading(false);
         }
-    };    const fetchSectionData = async (section: ManagementSection) => {
+    }; const fetchSectionData = async (section: ManagementSection) => {
         if (section === 'overview') return;
 
         try {
             setLoading(true);
-            
+
             // Special handling for admins - use different endpoint
             if (section === 'admins') {
                 const adminResponse = await fetch(`${API_URL}/admin`);
                 const adminData = await adminResponse.json();
                 const fixedAdminData = fixObjectEncoding(adminData);
                 setAdmins(fixedAdminData.rows || []);
-                addQuery(fixedAdminData.executedQuery || 'SELECT id, username FROM security.Admins', 'GET /admin');
+                if (fixedAdminData.executedQuery) {
+                    addQuery(fixedAdminData.executedQuery, 'GET /admin');
+                }
                 return;
             }
 
@@ -174,7 +176,10 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
             const data = await response.json();
             const fixedData = fixObjectEncoding(data);
 
-            addQuery(fixedData.executedQuery || `SELECT * FROM ${section}`, `GET /${section}`);
+            // Add the actual SQL query to context
+            if (fixedData.executedQuery) {
+                addQuery(fixedData.executedQuery, `GET /${section}`);
+            }
 
             switch (section) {
                 case 'alunos':
@@ -263,7 +268,9 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
 
             if (response.ok) {
                 const data = await response.json();
-                addQuery(data.executedQuery || `DELETE FROM ${currentSection} WHERE id = ${id}`, `DELETE /${currentSection}/${id}`);
+                if (data.executedQuery) {
+                    addQuery(data.executedQuery, `DELETE /${currentSection === 'admins' ? 'admin' : currentSection}/${id}`);
+                }
                 await fetchSectionData(currentSection);
             }
         } catch (error) {
@@ -302,7 +309,13 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
 
             if (response.ok) {
                 const data = await response.json();
-                addQuery(data.executedQuery || `${method} to ${currentSection}`, `${method} /${currentSection}${isEdit && selectedItem ? `/${selectedItem.id}` : ''}`);
+                if (data.executedQuery) {
+                    const methodText = isEdit ? 'PUT' : 'POST';
+                    const endpoint = isEdit && selectedItem ?
+                        `/${currentSection === 'admins' ? 'admin' : currentSection}/${selectedItem.id}` :
+                        `/${currentSection === 'admins' ? 'admin' : currentSection}`;
+                    addQuery(data.executedQuery, `${methodText} ${endpoint}`);
+                }
                 setActionMode('list');
                 await fetchSectionData(currentSection);
             }
@@ -636,7 +649,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Aluno).nome || 'N/A'}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Aluno).email || 'N/A'}</td>                                            <td className="px-4 py-3 text-sm">
                                                 <select
-                                                    value={(item as Aluno).status_pagamento || 'ativo'}                                                    onChange={async (e) => {
+                                                    value={(item as Aluno).status_pagamento || 'ativo'} onChange={async (e) => {
                                                         const newStatus = e.target.value;
                                                         try {
                                                             const response = await fetch(`${API_URL}/alunos/${item.id}/status`, {
@@ -646,7 +659,9 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                                             });
                                                             if (response.ok) {
                                                                 const data = await response.json();
-                                                                addQuery(data.executedQuery || `UPDATE alunos SET status_pagamento = '${newStatus}' WHERE id = ${item.id}`, `PUT /alunos/${item.id}/status`);
+                                                                if (data.executedQuery) {
+                                                                    addQuery(data.executedQuery, `PUT /alunos/${item.id}/status`);
+                                                                }
                                                                 await fetchSectionData('alunos');
                                                             }
                                                         } catch (error) {
@@ -655,8 +670,8 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                                     }}
                                                     className="flex items-center space-x-2 px-3 py-1 rounded-lg text-sm font-medium border-0 bg-transparent focus:ring-2 focus:ring-blue-500 focus:outline-none cursor-pointer"
                                                     style={{
-                                                        color: (item as Aluno).status_pagamento === 'ativo' ? '#059669' : 
-                                                               (item as Aluno).status_pagamento === 'inativo' ? '#6b7280' : '#dc2626',
+                                                        color: (item as Aluno).status_pagamento === 'ativo' ? '#059669' :
+                                                            (item as Aluno).status_pagamento === 'inativo' ? '#6b7280' : '#dc2626',
                                                         appearance: 'none',
                                                         backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e")`,
                                                         backgroundPosition: 'right 0.5rem center',
@@ -841,7 +856,7 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
     }; if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-7xl max-h-[90vh] overflow-hidden flex">
                 {/* Sidebar */}
                 <div className="w-64 bg-gray-50 dark:bg-slate-700 border-r border-gray-200 dark:border-gray-600 p-6">

@@ -27,9 +27,10 @@ interface CourseSelectorProps {
     isOpen: boolean;
     onClose: () => void;
     onSelectCourse: (course: Curso) => void;
+    enrolledCourseIds?: number[]; // IDs dos cursos em que o aluno já está matriculado
 }
 
-export default function CourseSelector({ isOpen, onClose, onSelectCourse }: CourseSelectorProps) {
+export default function CourseSelector({ isOpen, onClose, onSelectCourse, enrolledCourseIds = [] }: CourseSelectorProps) {
     const [areas, setAreas] = useState<Area[]>([]);
     const [cursos, setCursos] = useState<Curso[]>([]);
     const [selectedArea, setSelectedArea] = useState<number | null>(null);
@@ -76,8 +77,8 @@ export default function CourseSelector({ isOpen, onClose, onSelectCourse }: Cour
     };
 
     const filteredCursos = selectedArea
-        ? cursos.filter(curso => curso.area_id === selectedArea)
-        : cursos;
+        ? cursos.filter(curso => curso.area_id === selectedArea && !enrolledCourseIds.includes(curso.id))
+        : cursos.filter(curso => !enrolledCourseIds.includes(curso.id));
 
     const handleSelectCourse = (curso: Curso) => {
         onSelectCourse(curso);
@@ -87,7 +88,7 @@ export default function CourseSelector({ isOpen, onClose, onSelectCourse }: Cour
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[70] flex items-start justify-center p-4 pt-20 min-h-screen overflow-y-auto">
             <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-6 text-white">
@@ -139,7 +140,14 @@ export default function CourseSelector({ isOpen, onClose, onSelectCourse }: Cour
                             {filteredCursos.length === 0 ? (
                                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                                     <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                                    <p>Nenhum curso encontrado nesta área.</p>
+                                    {enrolledCourseIds.length > 0 ? (
+                                        <div>
+                                            <p className="mb-2">Você já está matriculado em todos os cursos disponíveis!</p>
+                                            <p className="text-sm">Parabéns pelo seu progresso nos estudos! 🎉</p>
+                                        </div>
+                                    ) : (
+                                        <p>Nenhum curso encontrado nesta área.</p>
+                                    )}
                                 </div>
                             ) : (
                                 filteredCursos.map((curso) => {
