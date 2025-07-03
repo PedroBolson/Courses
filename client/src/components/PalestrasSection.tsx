@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, MapPin, Users } from 'lucide-react';
 import { useQuery } from '@/contexts/QueryContext';
 import { fixObjectEncoding } from '@/utils/textUtils';
+import PalestraRegistrationModal from './PalestraRegistrationModal';
 
 interface Pessoa {
     id: number;
@@ -34,6 +35,8 @@ export default function PalestrasSection() {
     const [pessoas, setPessoas] = useState<Pessoa[]>([]);
     const [areas, setAreas] = useState<Area[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedPalestra, setSelectedPalestra] = useState<Palestra | null>(null);
     const { addQuery } = useQuery(); useEffect(() => {
         const fetchData = async () => {
             try {
@@ -76,6 +79,16 @@ export default function PalestrasSection() {
         } catch {
             return dateString;
         }
+    };
+
+    const handleOpenModal = (palestra: Palestra) => {
+        setSelectedPalestra(palestra);
+        setIsModalOpen(true);
+    };
+
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        setSelectedPalestra(null);
     };
 
     if (loading) {
@@ -154,7 +167,10 @@ export default function PalestrasSection() {
                                         </div>
 
                                         {/* CTA Button */}
-                                        <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg font-medium transition-colors">
+                                        <button
+                                            onClick={() => handleOpenModal(palestra)}
+                                            className="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 px-4 rounded-lg font-medium transition-colors"
+                                        >
                                             Inscrever-se na Palestra
                                         </button>
                                     </div>
@@ -183,6 +199,15 @@ export default function PalestrasSection() {
                     </div>
                 )}
             </div>
+
+            {/* Modal de Inscrição */}
+            <PalestraRegistrationModal
+                isOpen={isModalOpen}
+                onClose={handleCloseModal}
+                palestra={selectedPalestra}
+                convidado={selectedPalestra ? pessoas.find(p => p.id === selectedPalestra.convidado_id) : undefined}
+                area={selectedPalestra ? areas.find(a => a.id === selectedPalestra.area_id) : undefined}
+            />
         </section>
     );
 }
