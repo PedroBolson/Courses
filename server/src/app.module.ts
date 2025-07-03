@@ -15,6 +15,7 @@ import { PagamentosModule } from './pagamentos/pagamentos.module';
 import { VwController } from './vw/vw.controller';
 import { VwModule } from './vw/vw.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { InscricoesPalestrasModule } from './inscricoes-palestras/inscricoes-palestras.module';
 
 @Module({
   imports: [
@@ -32,7 +33,8 @@ import { FeedbackModule } from './feedback/feedback.module';
     PalestrasModule,
     PagamentosModule,
     VwModule,
-    FeedbackModule
+    FeedbackModule,
+    InscricoesPalestrasModule
   ],
   controllers: [AppController, VwController],
   providers: [AppService],

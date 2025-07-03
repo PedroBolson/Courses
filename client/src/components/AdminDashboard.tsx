@@ -56,6 +56,7 @@ interface Pessoa {
     nome: string;
     email: string;
     telefone: string;
+    cpf: string;
 }
 
 interface Area {
@@ -243,16 +244,61 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
         setActionMode('create');
         setSelectedItem(null);
         setFormData(getEmptyFormData(currentSection));
-    }; const handleEdit = (item: DataItem) => {
+    };
+
+    const handleEdit = async (item: DataItem) => {
         setActionMode('edit');
         setSelectedItem(item);
-        setFormData({ ...item });
+
+        // Para pessoas, buscar dados completos incluindo CPF
+        if (currentSection === 'pessoas') {
+            try {
+                const response = await fetch(`${API_URL}/pessoas/${item.id}`);
+                const data = await response.json();
+
+                const fixedData = fixObjectEncoding(data);
+
+                if (fixedData.executedQuery) {
+                    addQuery(fixedData.executedQuery, `GET /pessoas/${item.id}`);
+                }
+
+                if (fixedData.rows && fixedData.rows.length > 0) {
+                    const personData = fixedData.rows[0];
+
+                    // Mapear o campo CPF maiúsculo para minúsculo para compatibilidade
+                    const mappedPersonData = {
+                        ...personData,
+                        cpf: personData.CPF || personData.cpf, // Usar CPF maiúsculo se existir, senão usar minúsculo
+                        telefone: personData.telefone || personData.TELEFONE // Garantir que telefone também seja mapeado
+                    };
+
+                    // Formatar CPF e telefone para exibição no formulário
+                    if (mappedPersonData.cpf) {
+                        mappedPersonData.cpf = formatCPF(mappedPersonData.cpf);
+                    }
+                    if (mappedPersonData.telefone) {
+                        mappedPersonData.telefone = formatPhone(mappedPersonData.telefone);
+                    }
+
+                    setFormData({ ...mappedPersonData });
+                } else {
+                    setFormData({ ...item });
+                }
+            } catch (error) {
+                console.error('Error fetching person data:', error);
+                setFormData({ ...item });
+            }
+        } else {
+            setFormData({ ...item });
+        }
     };
 
     const handleView = (item: DataItem) => {
         setActionMode('view');
         setSelectedItem(item);
-    }; const handleDelete = async (id: number) => {
+    };
+
+    const handleDelete = async (id: number) => {
         // Special handling for admins - prevent self-deletion
         if (currentSection === 'admins' && id === currentAdmin.id) {
             alert('Você não pode excluir sua própria conta de administrador!');
@@ -278,7 +324,9 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
         } finally {
             setFormLoading(false);
         }
-    }; const handleSave = async () => {
+    };
+
+    const handleSave = async () => {
         try {
             setFormLoading(true);
 
@@ -301,10 +349,22 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                 method = isEdit ? 'PUT' : 'POST';
             }
 
+            // Preparar dados para envio - remover formatação de CPF e telefone para pessoas
+            // O banco de dados espera apenas números, sem pontos, hífens ou parênteses
+            const dataToSend = { ...formData };
+            if (currentSection === 'pessoas') {
+                if (dataToSend.cpf && typeof dataToSend.cpf === 'string') {
+                    dataToSend.cpf = cleanCPF(dataToSend.cpf);
+                }
+                if (dataToSend.telefone && typeof dataToSend.telefone === 'string') {
+                    dataToSend.telefone = cleanPhone(dataToSend.telefone);
+                }
+            }
+
             const response = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(dataToSend)
             });
 
             if (response.ok) {
@@ -324,23 +384,76 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
         } finally {
             setFormLoading(false);
         }
-    }; const getEmptyFormData = (section: ManagementSection): FormDataType => {
+    };    // Função para remover formatação do CPF (retorna apenas números)
+    const cleanCPF = (cpf: string) => {
+        return cpf.replace(/\D/g, '');
+    };
+
+    // Função para remover formatação do telefone (retorna apenas números)
+    const cleanPhone = (phone: string) => {
+        return phone.replace(/\D/g, '');
+    };
+
+    // Função para formatar CPF (xxx.xxx.xxx-xx)
+    const formatCPF = (value: string) => {
+        // Remove tudo que não é dígito
+        const cpf = value.replace(/\D/g, '');
+
+        // Limita a 11 dígitos
+        const limitedCpf = cpf.slice(0, 11);
+
+        // Aplica máscara conforme quantidade de dígitos
+        if (limitedCpf.length <= 3) {
+            return limitedCpf;
+        } else if (limitedCpf.length <= 6) {
+            return `${limitedCpf.slice(0, 3)}.${limitedCpf.slice(3)}`;
+        } else if (limitedCpf.length <= 9) {
+            return `${limitedCpf.slice(0, 3)}.${limitedCpf.slice(3, 6)}.${limitedCpf.slice(6)}`;
+        } else {
+            return `${limitedCpf.slice(0, 3)}.${limitedCpf.slice(3, 6)}.${limitedCpf.slice(6, 9)}-${limitedCpf.slice(9, 11)}`;
+        }
+    };
+
+    // Função para formatar telefone ((xx) 9xxxx-xxxx)
+    const formatPhone = (value: string) => {
+        // Remove tudo que não é dígito
+        const phone = value.replace(/\D/g, '');
+
+        // Limita a 11 dígitos
+        const limitedPhone = phone.slice(0, 11);
+
+        // Aplica máscara conforme quantidade de dígitos
+        if (limitedPhone.length <= 2) {
+            return limitedPhone;
+        } else if (limitedPhone.length <= 7) {
+            return `(${limitedPhone.slice(0, 2)}) ${limitedPhone.slice(2)}`;
+        } else {
+            return `(${limitedPhone.slice(0, 2)}) ${limitedPhone.slice(2, 7)}-${limitedPhone.slice(7)}`;
+        }
+    };
+
+    const getEmptyFormData = (section: ManagementSection): FormDataType => {
         switch (section) {
             case 'alunos':
-                return { pessoa_id: '', senha: '' }; case 'cursos':
+                return { pessoa_id: '', senha: '' };
+            case 'cursos':
                 return { titulo: '', descricao: '', professor_id: '', area_id: '', duracao_horas: '', valor: '' };
             case 'palestras':
                 return { titulo: '', descricao: '', data_hora: '', local: '', convidado_id: '', area_id: '' };
             case 'pessoas':
-                return { nome: '', email: '', telefone: '' };
+                return { nome: '', email: '', telefone: '', cpf: '' };
             case 'areas':
-                return { nome_area: '', descricao: '' }; case 'professores':
-                return { pessoa_id: '', especialidade: '', data_contratacao: '' }; case 'admins':
+                return { nome_area: '', descricao: '' };
+            case 'professores':
+                return { pessoa_id: '', especialidade: '', data_contratacao: '' };
+            case 'admins':
                 return { username: '', password: '' };
             default:
                 return {};
         }
-    }; const renderFormField = (field: string, value: string | number | undefined, type: string = 'text') => {
+    };
+
+    const renderFormField = (field: string, value: string | number | undefined, type: string = 'text') => {
         if (type === 'select') {
             let options: (Pessoa | Area)[] = [];
             if (field === 'pessoa_id' || field === 'convidado_id') options = pessoas;
@@ -353,7 +466,8 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                     onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
                     required
-                >                    <option value="">Selecione...</option>
+                >
+                    <option value="">Selecione...</option>
                     {options.map((option) => (
                         <option key={option.id} value={option.id}>
                             {'nome' in option ? option.nome : 'nome_area' in option ? option.nome_area : ''}
@@ -370,6 +484,39 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                     onChange={(e) => setFormData({ ...formData, [field]: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
                     rows={3}
+                />
+            );
+        }
+
+        // Tratamento especial para CPF e telefone com máscaras
+        if (field === 'cpf') {
+            return (
+                <input
+                    type="text"
+                    value={value || ''}
+                    onChange={(e) => {
+                        const formattedCpf = formatCPF(e.target.value);
+                        setFormData({ ...formData, [field]: formattedCpf });
+                    }}
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
+                />
+            );
+        }
+
+        if (field === 'telefone') {
+            return (
+                <input
+                    type="text"
+                    value={value || ''}
+                    onChange={(e) => {
+                        const formattedPhone = formatPhone(e.target.value);
+                        setFormData({ ...formData, [field]: formattedPhone });
+                    }}
+                    placeholder="(00) 00000-0000"
+                    maxLength={15}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:text-white"
                 />
             );
         }
@@ -522,6 +669,12 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                             </label>
                             {renderFormField('telefone', formData.telefone, 'tel')}
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                CPF
+                            </label>
+                            {renderFormField('cpf', formData.cpf)}
+                        </div>
                     </>
                 ); case 'areas':
                 return (
@@ -582,7 +735,9 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
             default:
                 return null;
         }
-    }; const renderListView = () => {
+    };
+
+    const renderListView = () => {
         let data: DataItem[] = [];
         let columns: string[] = []; switch (currentSection) {
             case 'alunos':
@@ -640,16 +795,19 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                     Ações
                                 </th>
                             </tr>
-                        </thead>                        <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                             {data.map((item) => (
                                 <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-slate-700">
                                     {currentSection === 'alunos' && (
                                         <>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Aluno).nome || 'N/A'}</td>
-                                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Aluno).email || 'N/A'}</td>                                            <td className="px-4 py-3 text-sm">
+                                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Aluno).email || 'N/A'}</td>
+                                            <td className="px-4 py-3 text-sm">
                                                 <select
-                                                    value={(item as Aluno).status_pagamento || 'ativo'} onChange={async (e) => {
+                                                    value={(item as Aluno).status_pagamento || 'ativo'}
+                                                    onChange={async (e) => {
                                                         const newStatus = e.target.value;
                                                         try {
                                                             const response = await fetch(`${API_URL}/alunos/${item.id}/status`, {
@@ -689,7 +847,8 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                                 {(item as Aluno).data_matricula ? new Date((item as Aluno).data_matricula).toLocaleDateString('pt-BR') : 'N/A'}
                                             </td>
                                         </>
-                                    )}                                    {currentSection === 'cursos' && (
+                                    )}
+                                    {currentSection === 'cursos' && (
                                         <>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Curso).titulo}</td>
@@ -719,13 +878,15 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Pessoa).email}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Pessoa).telefone || 'N/A'}</td>
                                         </>
-                                    )}                                    {currentSection === 'areas' && (
+                                    )}
+                                    {currentSection === 'areas' && (
                                         <>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Area).nome_area}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Area).descricao}</td>
                                         </>
-                                    )}                                    {currentSection === 'professores' && (
+                                    )}
+                                    {currentSection === 'professores' && (
                                         <>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Professor).nome || 'N/A'}</td>
@@ -735,12 +896,14 @@ export default function AdminDashboard({ isOpen, onClose }: AdminDashboardProps)
                                                 {(item as Professor).data_contratacao ? new Date((item as Professor).data_contratacao).toLocaleDateString('pt-BR') : 'N/A'}
                                             </td>
                                         </>
-                                    )}                                    {currentSection === 'admins' && (
+                                    )}
+                                    {currentSection === 'admins' && (
                                         <>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.id}</td>
                                             <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{(item as Admin).username}</td>
                                         </>
-                                    )}                                    <td className="px-4 py-3 text-right">
+                                    )}
+                                    <td className="px-4 py-3 text-right">
                                         <div className="flex justify-end space-x-2">
                                             <button
                                                 onClick={() => handleView(item)}

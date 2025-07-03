@@ -34,9 +34,4 @@ export class AlunosController {
   login(@Body() body: { email: string; password: string }) {
     return this.alunosService.login(body.email, body.password);
   }
-
-  @Get(':id/cursos')
-  getCursos(@Param('id') id: string) {
-    return this.alunosService.getCursosDoAluno(+id);
-  }
 }

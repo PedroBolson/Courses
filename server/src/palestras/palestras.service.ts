@@ -5,6 +5,22 @@ import { DatabaseService } from '../database/database.service';
 export class PalestrasService {
   constructor(private db: DatabaseService) { }
 
+  // Método auxiliar para formatar data para o SQL Server
+  private formatDateForSqlServer(dateString: string): string {
+    try {
+      // Verifica se é uma data válida
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        throw new Error('Data inválida');
+      }
+      // Formato ISO que o SQL Server aceita (YYYY-MM-DD HH:MM:SS)
+      return date.toISOString().slice(0, 19).replace('T', ' ');
+    } catch (error) {
+      // Mantém o valor original se não conseguir converter
+      return dateString;
+    }
+  }
+
   // Cria nova palestra (insert em catalogo.Palestras)
   async create(
     titulo: string,
@@ -14,6 +30,9 @@ export class PalestrasService {
     convidado_id: number,
     area_id: number
   ) {
+    // Formatação da data para o SQL Server
+    const formattedDate = this.formatDateForSqlServer(data_hora);
+
     const query = `
       INSERT INTO catalogo.Palestras (
         titulo,
@@ -34,7 +53,7 @@ export class PalestrasService {
     return this.db.executeQuery(query, [
       titulo,
       descricao,
-      data_hora,
+      formattedDate,
       local,
       convidado_id,
       area_id,
@@ -84,6 +103,9 @@ export class PalestrasService {
     convidado_id: number,
     area_id: number
   ) {
+    // Formatação da data para o SQL Server
+    const formattedDate = this.formatDateForSqlServer(data_hora);
+
     const query = `
       UPDATE catalogo.Palestras
       SET titulo = @param1,
@@ -97,7 +119,7 @@ export class PalestrasService {
       id,
       titulo,
       descricao,
-      data_hora,
+      formattedDate,
       local,
       convidado_id,
       area_id,
