@@ -124,7 +124,7 @@ export default function Hero() {
                                     <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                                 </div>
                                 <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.alunos > 0 ? stats.alunos : '5000+'}+</div>
-                                <div className="text-sm text-gray-600 dark:text-gray-400">Alunos Aprovados</div>
+                                <div className="text-sm text-gray-600 dark:text-gray-400">Alunos</div>
                             </div>
 
                             <div className="text-center">
